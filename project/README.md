@@ -1,4 +1,4 @@
-# Dataset Directory - Source Code and Analysis
+# Project Directory - Source Code and Analysis
 
 This directory contains all the source code, data processing scripts, and analysis pipelines for the Music Genealogy Project.
 
@@ -7,7 +7,7 @@ This directory contains all the source code, data processing scripts, and analys
 ## 📁 Directory Structure
 
 ```
-dataset/
+project/
 ├── src/                    # Core analysis scripts (8 files)
 │   ├── data_preparation.py
 │   ├── top_ranking.py
