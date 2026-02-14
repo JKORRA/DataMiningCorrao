@@ -1,6 +1,6 @@
 """
-REPORT FIGURE GENERATOR
-Generates all plots, graphs, and statistics needed for the academic report
+Report Figure Generator
+Generates all plots, graphs, and statistics for the academic report.
 """
 
 from pyspark.sql import SparkSession
@@ -11,21 +11,18 @@ import matplotlib.patches as mpatches
 import numpy as np
 import os
 
-# Set matplotlib style for publication quality
 plt.style.use('seaborn-v0_8-paper')
 plt.rcParams['figure.dpi'] = 300
 plt.rcParams['savefig.dpi'] = 300
 plt.rcParams['font.size'] = 10
 plt.rcParams['font.family'] = 'serif'
 
-# Create output directory
 os.makedirs('report_figures', exist_ok=True)
 
 print("=" * 80)
 print("GENERATING REPORT FIGURES AND STATISTICS")
 print("=" * 80)
 
-# Initialize Spark
 spark = SparkSession.builder \
     .appName("ReportFigures") \
     .config("spark.driver.memory", "4g") \
@@ -33,14 +30,11 @@ spark = SparkSession.builder \
 
 spark.sparkContext.setLogLevel("ERROR")
 
-# Load data
 print("\nLoading data...")
 df_graph = spark.read.parquet("outputs/music_graph.parquet")
 df_graph.cache()
 
-# =============================================================================
-# FIGURE 1: DEGREE DISTRIBUTION (Log-Log Plot)
-# =============================================================================
+# Figure 1: Degree Distribution
 print("\n[1/8] Generating Degree Distribution Plot...")
 
 in_degree = df_graph.groupBy("Original_Artist_Name") \
@@ -80,9 +74,7 @@ plt.savefig('figures/report_figures/fig1_degree_distribution.pdf', bbox_inches='
 print("   ✓ Saved: fig1_degree_distribution.png/pdf")
 plt.close()
 
-# =============================================================================
-# FIGURE 2: VOLUME VS AUTHORITY COMPARISON (Top 20)
-# =============================================================================
+# Figure 2: Volume vs Authority Comparison
 print("\n[2/8] Generating Volume vs Authority Comparison...")
 
 # Get top 20 by volume (in-degree)
@@ -128,18 +120,11 @@ try:
 except Exception as e:
     print(f"   ⚠ Warning: Could not generate authority comparison (run PageRank first): {e}")
 
-# =============================================================================
-# FIGURE 3: PAGERANK CONVERGENCE PLOT
-# =============================================================================
+# Figure 3: PageRank Convergence (placeholder)
 print("\n[3/8] Generating PageRank Convergence Plot...")
-
-# Note: This requires saving convergence history during PageRank execution
-# For now, we'll create a placeholder based on typical convergence
 print("   ⚠ Note: Run PageRank with convergence logging to generate this plot")
 
-# =============================================================================
-# FIGURE 4: CLUSTER SIZE DISTRIBUTION
-# =============================================================================
+# Figure 4: Cluster Size Distribution
 print("\n[4/8] Generating Cluster Size Distribution...")
 
 try:
@@ -184,9 +169,7 @@ try:
 except Exception as e:
     print(f"   ⚠ Warning: Could not generate cluster distribution (run clustering first): {e}")
 
-# =============================================================================
-# FIGURE 5: GRAPH STATISTICS SUMMARY
-# =============================================================================
+# Figure 5: Graph Statistics Summary
 print("\n[5/8] Generating Graph Statistics Summary...")
 
 total_edges = df_graph.count()
@@ -267,9 +250,7 @@ plt.savefig('figures/report_figures/fig5_graph_statistics.pdf', bbox_inches='tig
 print("   ✓ Saved: fig5_graph_statistics.png/pdf")
 plt.close()
 
-# =============================================================================
-# FIGURE 6: TOP ARTISTS COMPARISON TABLE
-# =============================================================================
+# Figure 6: Top Artists Comparison Table
 print("\n[6/8] Generating Top Artists Comparison Table...")
 
 try:
@@ -330,9 +311,7 @@ try:
 except Exception as e:
     print(f"   ⚠ Warning: Could not generate comparison table: {e}")
 
-# =============================================================================
-# FIGURE 7: POWER LAW VALIDATION
-# =============================================================================
+# Figure 7: Power-Law Analysis
 print("\n[7/8] Generating Power-Law Analysis...")
 
 # Calculate cumulative distribution
@@ -358,7 +337,7 @@ plt.savefig('figures/report_figures/fig7_powerlaw_analysis.pdf', bbox_inches='ti
 print("   ✓ Saved: fig7_powerlaw_analysis.png/pdf")
 plt.close()
 
-# Calculate concentration (Gini-like metric)
+# Concentration analysis
 total_samples = in_degree['degree'].sum()
 top_1_percent = int(len(in_degree) * 0.01)
 top_5_percent = int(len(in_degree) * 0.05)
@@ -374,9 +353,7 @@ print(f"   Top 1% of artists: {top1_share:.1f}% of all sampling events")
 print(f"   Top 5% of artists: {top5_share:.1f}% of all sampling events")
 print(f"   Top 10% of artists: {top10_share:.1f}% of all sampling events")
 
-# =============================================================================
-# FIGURE 8: METHODOLOGY FLOWCHART (Text-based)
-# =============================================================================
+# Figure 8: Methodology Flowchart
 print("\n[8/8] Generating Methodology Summary...")
 
 fig, ax = plt.subplots(figsize=(10, 8))
@@ -428,9 +405,7 @@ plt.savefig('figures/report_figures/fig8_methodology_flowchart.pdf', bbox_inches
 print("   ✓ Saved: fig8_methodology_flowchart.png/pdf")
 plt.close()
 
-# =============================================================================
-# GENERATE LATEX TABLES
-# =============================================================================
+# Generate LaTeX tables
 print("\n[BONUS] Generating LaTeX tables...")
 
 # Top 10 comparison table
@@ -475,9 +450,7 @@ try:
 except Exception as e:
     print(f"   ⚠ Warning: Could not generate LaTeX table: {e}")
 
-# =============================================================================
-# SUMMARY STATISTICS FILE
-# =============================================================================
+# Generate summary statistics file
 print("\n[BONUS] Generating summary statistics file...")
 
 with open('figures/report_figures/statistics_summary.txt', 'w') as f:

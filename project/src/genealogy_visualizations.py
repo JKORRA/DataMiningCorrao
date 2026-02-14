@@ -1,23 +1,6 @@
 """
-Music Genealogy Visualizations - IMPROVED VERSION
-==================================================
-
-Creates clean, publication-quality network visualizations:
-1. Top 15 Artists - Simplified network (not confusing!)
-2. James Brown Ego Network - Non-overlapping labels
-3. Koji Kondo Ego Network - Non-overlapping labels
-4. Cluster Communities - Top 3 only (cleaner)
-5. Sampling Flow - Bipartite layout (clear flow)
-6. Hub Analysis - Scatter plot with top artists labeled
-
-IMPROVEMENTS:
-- Fewer nodes (15 instead of 20) for clarity
-- Better layouts to avoid overlapping
-- Adjusted node positions manually where needed
-- Larger figure sizes for readability
-- Better color schemes
-- Clearer arrows and labels
-- No overlapping text
+Music Genealogy Network Visualizations
+Creates publication-quality network visualizations for the music sampling network.
 """
 
 import pandas as pd
@@ -31,7 +14,6 @@ from pyspark.sql.functions import col, count, sum as _sum, avg, desc
 import warnings
 warnings.filterwarnings('ignore')
 
-# Configure matplotlib for publication quality
 plt.style.use('seaborn-v0_8-whitegrid')
 plt.rcParams['figure.dpi'] = 300
 plt.rcParams['savefig.dpi'] = 300
@@ -41,40 +23,35 @@ plt.rcParams['axes.titlesize'] = 14
 plt.rcParams['legend.fontsize'] = 10
 
 print("=" * 80)
-print("MUSIC GENEALOGY NETWORK VISUALIZATIONS - IMPROVED")
+print("MUSIC GENEALOGY NETWORK VISUALIZATIONS")
 print("=" * 80)
 
-# Initialize Spark
 spark = SparkSession.builder \
     .appName("MusicGenealogy_CleanViz") \
     .config("spark.driver.memory", "6g") \
     .getOrCreate()
 spark.sparkContext.setLogLevel("ERROR")
 
-# Load data
 print("\n[1/6] Loading data...")
 df_graph = spark.read.parquet("outputs/music_graph.parquet")
 
-# IMPORTANT: Verify self-loops were already removed
+# Verify self-loops were removed
 self_loops = df_graph.filter(col("Sampler_Artist_Name") == col("Original_Artist_Name")).count()
 if self_loops > 0:
     print(f"WARNING: Found {self_loops} self-loops! Removing them now...")
     df_graph = df_graph.filter(col("Sampler_Artist_Name") != col("Original_Artist_Name"))
 else:
-    print("✓ No self-loops detected (visualizations will be clean!)")
+    print("✓ No self-loops detected")
 
 df_pagerank = spark.read.parquet("outputs/artist_pagerank.parquet")
 print(f"Graph loaded: {df_graph.count()} edges")
 
-# Create output directory
 import os
 output_dir = "genealogy_networks"
 os.makedirs(output_dir, exist_ok=True)
 print(f"✓ Output directory: {output_dir}/\n")
 
-# ==========================================
-# FIGURE 1: TOP 15 ARTISTS - CLEAN NETWORK
-# ==========================================
+# Figure 1: Top 15 Artists Network
 print("=" * 80)
 print("[FIGURE 1] Top 15 Artists - Clean Sampling Network")
 print("=" * 80)
@@ -175,11 +152,9 @@ plt.savefig(f"{output_dir}/fig1_top15_sampling_network.pdf", bbox_inches='tight'
 print(f"✓ Saved: fig1_top15_sampling_network.png/pdf\n")
 plt.close()
 
-# ==========================================
-# FIGURE 2: JAMES BROWN EGO NETWORK - IMPROVED
-# ==========================================
+# Figure 2: James Brown Ego Network
 print("=" * 80)
-print("[FIGURE 2] James Brown - Ego Network (No Overlapping!)")
+print("[FIGURE 2] James Brown - Ego Network")
 print("=" * 80)
 
 # Get top 20 artists who sampled James Brown (limit for clarity)
@@ -282,11 +257,9 @@ plt.savefig(f"{output_dir}/fig2_jamesbrown_ego_network.pdf", bbox_inches='tight'
 print(f"✓ Saved: fig2_jamesbrown_ego_network.png/pdf\n")
 plt.close()
 
-# ==========================================
-# FIGURE 3: KOJI KONDO EGO NETWORK - IMPROVED
-# ==========================================
+# Figure 3: Koji Kondo Ego Network
 print("=" * 80)
-print("[FIGURE 3] Koji Kondo (近藤浩治) - Ego Network (No Overlapping!)")
+print("[FIGURE 3] Koji Kondo (近藤浩治) - Ego Network")
 print("=" * 80)
 
 # Get artists who sampled Koji Kondo
@@ -388,11 +361,9 @@ if len(kk_samplers) > 0:
 else:
     print("⚠ No sampling data found for Koji Kondo\n")
 
-# ==========================================
-# FIGURE 4: SAMPLING FLOW - CLEAR BIPARTITE
-# ==========================================
+# Figure 4: Sampling Flow - Bipartite Layout
 print("=" * 80)
-print("[FIGURE 4] Sampling Flow - Samplers → Sampled (Bipartite Layout)")
+print("[FIGURE 4] Sampling Flow - Samplers → Sampled")
 print("=" * 80)
 
 # Get top 10 samplers (out-degree)
@@ -486,9 +457,7 @@ plt.savefig(f"{output_dir}/fig4_sampling_flow.pdf", bbox_inches='tight')
 print(f"✓ Saved: fig4_sampling_flow.png/pdf\n")
 plt.close()
 
-# ==========================================
-# FIGURE 5: HUB ANALYSIS - SCATTER PLOT
-# ==========================================
+# Figure 5: Hub Analysis - Scatter Plot
 print("=" * 80)
 print("[FIGURE 5] Hub Analysis - In-Degree vs Out-Degree")
 print("=" * 80)
@@ -578,19 +547,9 @@ plt.savefig(f"{output_dir}/fig5_hub_analysis.pdf", bbox_inches='tight')
 print(f"✓ Saved: fig5_hub_analysis.png/pdf\n")
 plt.close()
 
-# ==========================================
-# CLEANUP
-# ==========================================
 spark.stop()
 
 print("=" * 80)
 print("✓ ALL VISUALIZATIONS COMPLETE!")
 print("=" * 80)
-print(f"\nGenerated 5 improved visualizations in: {output_dir}/\n")
-print("IMPROVEMENTS:")
-print("  • Figure 1: Reduced to top 15 (less confusing), stronger connections only")
-print("  • Figure 2: Circular layout, no overlapping labels")
-print("  • Figure 3: Circular layout, no overlapping labels")
-print("  • Figure 4: Clear bipartite flow diagram (THIS IS FIGURE 5 from before)")
-print("  • Figure 5: Hub analysis with smart label positioning")
-print("\nAll figures are clean and publication-ready! 🎉\n")
+print(f"\nGenerated 5 visualizations in: {output_dir}/\n")

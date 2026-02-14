@@ -1,30 +1,32 @@
+"""
+Cluster Visualization
+Visualizes the music genealogy clusters using network graphs.
+"""
+
 import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-import numpy as np  # <--- ECCO L'IMPORT CHE MANCAVA
+import numpy as np
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, max as _max, first, greatest, count
 
-# 1. Configurazione
 spark = SparkSession.builder \
     .appName("MusicGenealogy_FinalViz") \
     .config("spark.driver.memory", "4g") \
     .getOrCreate()
 spark.sparkContext.setLogLevel("ERROR")
 
-print("Caricamento dati...")
+print("Loading data...")
 df_graph = spark.read.parquet("outputs/music_graph.parquet")
 
-# ==========================================
-# 2. RICALCOLO VELOCE DEI CLUSTER
-# ==========================================
-print("Ricalcolo rapido dei cluster...")
+# Quick cluster computation
+print("Recomputing clusters...")
 edges = df_graph.select(col("source_song_id").alias("child"), col("target_song_id").alias("parent")).distinct()
 nodes = edges.select("child").union(edges.select("parent")).distinct()
 labels = nodes.select(col("child").alias("id"), col("child").alias("label"))
 
-# 3 Iterazioni bastano per i colori
+# Run 3 iterations of label propagation
 for i in range(3):
     propagation = edges.join(labels, edges.parent == labels.id).select(col("child"), col("label").alias("parent_label"))
     current_state = labels.alias("l").join(propagation.alias("p"), col("l.id") == col("p.child"), "left_outer") \
@@ -32,31 +34,25 @@ for i in range(3):
     labels = current_state.groupBy("id").agg(_max(col("new_proposal")).alias("max_proposal"), first("old_label").alias("old")) \
         .select(col("id"), greatest(col("max_proposal"), col("old")).alias("label"))
 
-# Mappatura Artista -> Cluster ID
+# Map artists to clusters
 song_artist_map = df_graph.select(col("target_song_id").alias("song_id"), col("Original_Artist_Name").alias("artist_name")).distinct()
 
-# CORREZIONE 2: dropDuplicates per evitare che un artista appaia 10 volte se ha 10 cluster diversi
 artist_clusters = labels.join(song_artist_map, labels.label == song_artist_map.song_id) \
     .select(col("artist_name"), col("label").alias("cluster_id")) \
-    .dropDuplicates(["artist_name"]) 
+    .dropDuplicates(["artist_name"])
 
-# ==========================================
-# 3. SELEZIONE INTELLIGENTE DEI DATI DA DISEGNARE
-# ==========================================
-print("Selezione delle connessioni più forti...")
+# Select top connections for visualization
+print("Selecting top connections...")
 
-# IMPROVED: Load PageRank scores and select top artists
-print("Caricamento PageRank scores...")
 try:
     pagerank_df = spark.read.parquet("artist_pagerank.parquet")
     top_artists_list = [row['artist'] for row in pagerank_df.orderBy(col("authority_score").desc()).limit(30).collect()]
-    print(f"Selezionati i top 30 artisti per PageRank")
+    print(f"Selected top 30 artists by PageRank")
 except:
-    print("PageRank non trovato, uso metodo alternativo (top per peso)")
+    print("PageRank not found, using alternative method")
     top_artists_list = None
 
 if top_artists_list:
-    # Filter edges involving top artists
     top_edges = df_graph.filter(
         (col("Original_Artist_Name").isin(top_artists_list)) | 
         (col("Sampler_Artist_Name").isin(top_artists_list))
@@ -68,7 +64,6 @@ if top_artists_list:
      .orderBy(col("weight").desc()) \
      .limit(80)
 else:
-    # Fallback to original method
     top_edges = df_graph.filter(col("Original_Artist_Name") != "Ninja McTits") \
         .filter(col("Sampler_Artist_Name") != "Ninja McTits") \
         .groupBy("Sampler_Artist_Name", "Original_Artist_Name") \
@@ -87,10 +82,8 @@ viz_data = top_edges.join(artist_clusters, top_edges.Original_Artist_Name == art
 pdf = viz_data.toPandas()
 spark.stop()
 
-# ==========================================
-# 4. DISEGNO CON MATPLOTLIB E NETWORKX
-# ==========================================
-print(f"Generazione grafico con {len(pdf)} archi...")
+# Generate graph visualization
+print(f"Generating graph with {len(pdf)} edges...")
 
 G = nx.DiGraph()
 
@@ -100,17 +93,14 @@ for _, row in pdf.iterrows():
     weight = row['weight']
     clus_id = row['cluster_id']
     
-    # Assegniamo al nodo 'Original' il suo cluster ID
     G.add_node(original, cluster=clus_id)
-    # Al nodo 'Sampler' diamo lo stesso colore del padre per mostrare l'appartenenza
     if sampler not in G.nodes:
         G.add_node(sampler, cluster=clus_id)
         
     G.add_edge(sampler, original, weight=weight)
 
-# Gestione Colori
+# Assign colors based on clusters
 unique_clusters = sorted(list(set(pdf['cluster_id'])))
-# Ora np.linspace funzionerà perché abbiamo importato numpy as np
 colors = cm.rainbow(np.linspace(0, 1, len(unique_clusters)))
 cluster_color_map = {cid: colors[i] for i, cid in enumerate(unique_clusters)}
 
@@ -119,11 +109,11 @@ for node in G.nodes():
     cid = G.nodes[node].get('cluster', -1)
     node_colors.append(cluster_color_map.get(cid, (0.8, 0.8, 0.8, 1)))
 
-# Dimensioni
+# Set node sizes based on degree
 d = dict(G.degree)
 node_sizes = [v * 100 + 300 for v in d.values()]
 
-# Layout
+# Use spring layout
 pos = nx.spring_layout(G, k=0.9, iterations=100, seed=42)
 
 plt.figure(figsize=(18, 12), facecolor='#f0f0f0')
@@ -134,10 +124,10 @@ nx.draw_networkx_edges(G, pos, edge_color='gray', alpha=0.4, arrowstyle='->', ar
 labels = {n: n for n in G.nodes() if G.degree(n) > 0} 
 nx.draw_networkx_labels(G, pos, labels=labels, font_size=9, font_weight='bold')
 
-plt.title("The Genealogy of Sound: Top Families", fontsize=20)
+plt.title("Music Genealogy: Top Families", fontsize=20)
 plt.axis('off')
 
 filename = "music_genealogy_final.png"
 plt.savefig(filename, dpi=150, bbox_inches='tight')
-print(f"Grafico salvato: {filename}")
+print(f"Graph saved: {filename}")
 plt.show()

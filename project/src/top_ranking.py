@@ -1,20 +1,21 @@
+"""
+Music Genealogy Analysis
+Analyzes the music sampling graph to identify influential artists and patterns.
+"""
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, desc, count
 
-# 1. Carichiamo il Grafo Pulito (Molto più veloce dei CSV)
 spark = SparkSession.builder.appName("MusicGenealogy_Analysis").getOrCreate()
 
-print("Caricamento del grafo salvato...")
+print("Loading saved graph...")
 df = spark.read.parquet("outputs/music_graph.parquet")
 
-# Cache in memoria perché faremo varie query su questo dataset
 df.cache()
 
-# =========================================================
-# ANALISI 1: THE MOST INFLUENTIAL (In-Degree Centrality)
-# =========================================================
-# Chi sono gli artisti più campionati della storia?
-print("\n--- TOP 20 ARTISTI PIÙ CAMPIONATI (I Padri Fondatori) ---")
+# Most influential artists (In-Degree Centrality)
+print("\n--- TOP 20 MOST SAMPLED ARTISTS ---")
+print("These artists are the most influential through being sampled by others")
 
 top_sampled = df.groupBy("Original_Artist_Name") \
     .agg(count("*").alias("times_sampled")) \
@@ -22,11 +23,9 @@ top_sampled = df.groupBy("Original_Artist_Name") \
 
 top_sampled.show(20, truncate=False)
 
-# =========================================================
-# ANALISI 2: THE SERIAL SAMPLERS (Out-Degree Centrality)
-# =========================================================
-# Chi sono gli artisti che campionano di più?
-print("\n--- TOP 20 SERIAL SAMPLERS (I Dj e Producer) ---")
+# Serial samplers (Out-Degree Centrality)
+print("\n--- TOP 20 SERIAL SAMPLERS ---")
+print("These artists use the most samples in their work (DJs and Producers)")
 
 top_samplers = df.groupBy("Sampler_Artist_Name") \
     .agg(count("*").alias("samples_used")) \
@@ -34,12 +33,9 @@ top_samplers = df.groupBy("Sampler_Artist_Name") \
 
 top_samplers.show(20, truncate=False)
 
-# =========================================================
-# ANALISI 3: LE CANZONI PIÙ SACCHEGGIATE
-# =========================================================
-# Qual è la singola canzone più usata nella storia?
-# (Spoiler: Probabilmente "Amen, Brother" o qualcosa di James Brown)
-print("\n--- TOP 10 CANZONI PIÙ CAMPIONATE ---")
+# Most sampled songs
+print("\n--- TOP 10 MOST SAMPLED SONGS ---")
+print("Individual songs that have been sampled the most")
 
 top_songs = df.groupBy("Original_Artist_Name", "Original_Song_Title") \
     .agg(count("*").alias("times_used")) \

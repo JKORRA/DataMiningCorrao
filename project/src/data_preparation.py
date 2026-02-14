@@ -1,4 +1,3 @@
-import sys
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 from pyspark.sql.functions import col
@@ -9,9 +8,9 @@ spark = SparkSession.builder \
     .config("spark.sql.shuffle.partitions", "200") \
     .getOrCreate()
 
-BASE_PATH = "mbdump" 
+BASE_PATH = "mbdump"
 
-# --- SCHEMI ---
+# Define schemas for MusicBrainz tables
 recording_schema = StructType([
     StructField("id", IntegerType(), True),
     StructField("gid", StringType(), True),
@@ -60,22 +59,23 @@ l_rec_rec_schema = StructType([
 def load_mb_table(filename, schema):
     return spark.read.option("delimiter", "\t").option("nullValue", "\\N").schema(schema).csv(f"{BASE_PATH}/{filename}")
 
-# --- CARICAMENTO ---
-print("Caricamento tabelle...")
+# Load MusicBrainz tables
+print("Loading MusicBrainz tables...")
 df_recording = load_mb_table("recording", recording_schema).select("id", "name", "artist_credit")
 df_artist_credit = load_mb_table("artist_credit", artist_credit_schema).select("id", "name")
 df_link = load_mb_table("link", link_schema).select("id", "link_type")
 df_l_rec_rec = load_mb_table("l_recording_recording", l_rec_rec_schema).select("link", "entity0", "entity1")
 
-# --- COSTRUZIONE ---
-print("Filtraggio relazioni...")
+# Filter for sampling relationships (link types 69 and 231)
+print("Filtering sampling relationships...")
 TARGET_LINK_TYPES = [69, 231]
 
 sampling_edges = df_l_rec_rec.join(df_link, df_l_rec_rec.link == df_link.id) \
     .filter(col("link_type").isin(TARGET_LINK_TYPES)) \
     .select(col("entity0").alias("source_song_id"), col("entity1").alias("target_song_id"))
 
-print("Arricchimento (Join)...")
+# Enrich edges with song and artist information
+print("Enriching graph with artist and song names...")
 df_source_info = sampling_edges.join(df_recording.alias("src_rec"), sampling_edges.source_song_id == col("src_rec.id")) \
                                .join(df_artist_credit.alias("src_art"), col("src_rec.artist_credit") == col("src_art.id")) \
                                .select(
@@ -88,7 +88,6 @@ df_source_info = sampling_edges.join(df_recording.alias("src_rec"), sampling_edg
 df_final_graph = df_source_info.join(df_recording.alias("tgt_rec"), df_source_info.target_song_id == col("tgt_rec.id")) \
                                .join(df_artist_credit.alias("tgt_art"), col("tgt_rec.artist_credit") == col("tgt_art.id")) \
                                .select(
-                                   # QUÍ STA LA CORREZIONE: MANTENIAMO GLI ID
                                    col("source_song_id"),
                                    col("target_song_id"),
                                    col("Sampler_Artist_Name"),
@@ -97,8 +96,7 @@ df_final_graph = df_source_info.join(df_recording.alias("tgt_rec"), df_source_in
                                    col("tgt_rec.name").alias("Original_Song_Title")
                                )
 
-# CRITICAL IMPROVEMENT: Remove self-loops (artist sampling themselves)
-# Self-loops represent remixes, re-releases, or data errors - not cross-artist influence
+# Remove self-loops (artists sampling themselves)
 edges_before = df_final_graph.count()
 print(f"Total edges before self-loop removal: {edges_before}")
 df_final_graph = df_final_graph.filter(col("Sampler_Artist_Name") != col("Original_Artist_Name"))
@@ -106,7 +104,8 @@ edges_after = df_final_graph.count()
 print(f"Edges after removing self-loops: {edges_after}")
 print(f"Self-loops removed: {edges_before - edges_after} edges")
 
-print(f"Salvataggio {edges_after} righe...")
+# Save the final graph
+print(f"Saving graph with {edges_after} edges...")
 df_final_graph.write.mode("overwrite").parquet("outputs/music_graph.parquet")
-print("Fatto. Ora puoi lanciare pagerank_manual.py")
+print("Graph saved successfully. Run compute_authority_manual.py next.")
 spark.stop()

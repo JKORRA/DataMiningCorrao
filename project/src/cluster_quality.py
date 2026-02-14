@@ -1,11 +1,10 @@
+"""
+Cluster Quality Analysis
+Evaluates the quality of Label Propagation clustering using metrics like Modularity and cohesion.
+"""
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, count, sum as _sum, expr, desc
-
-# =========================================================
-# CLUSTER QUALITY METRICS
-# =========================================================
-# This script evaluates the quality of the Label Propagation clustering
-# using metrics like Modularity and cluster cohesion.
 
 spark = SparkSession.builder \
     .appName("MusicGenealogy_ClusterQuality") \
@@ -16,7 +15,6 @@ print("=" * 70)
 print("CLUSTER QUALITY ANALYSIS")
 print("=" * 70)
 
-# Load data
 print("\nLoading data...")
 df_graph = spark.read.parquet("outputs/music_graph.parquet")
 df_labels = spark.read.parquet("outputs/music_labels.parquet")
@@ -24,9 +22,7 @@ df_labels = spark.read.parquet("outputs/music_labels.parquet")
 df_graph.cache()
 df_labels.cache()
 
-# =========================================================
-# 1. CLUSTER SIZE DISTRIBUTION
-# =========================================================
+# Cluster size distribution
 print("\n📊 CLUSTER SIZE DISTRIBUTION")
 print("-" * 70)
 
@@ -55,7 +51,6 @@ print(f"  Largest Cluster: {size_stats['max_size']:,} nodes")
 print(f"  Average Cluster Size: {size_stats['avg_size']:.2f} nodes")
 print(f"  Std Dev Cluster Size: {size_stats['stddev_size']:.2f}")
 
-# Distribution bins
 print("\nCluster Size Distribution:")
 cluster_sizes.select(
     expr("SUM(CASE WHEN cluster_size = 1 THEN 1 ELSE 0 END)").alias("Singleton (size=1)"),
@@ -65,12 +60,10 @@ cluster_sizes.select(
     expr("SUM(CASE WHEN cluster_size > 200 THEN 1 ELSE 0 END)").alias("Giant (>200)")
 ).show(truncate=False)
 
-# =========================================================
-# 2. MODULARITY CALCULATION
-# =========================================================
+# Modularity calculation
 print("\n🎯 MODULARITY SCORE")
 print("-" * 70)
-print("Modularity measures how well-separated the clusters are.")
+print("Modularity measures cluster separation quality.")
 print("Range: [-0.5, 1.0] | Good: >0.3 | Excellent: >0.5")
 
 # Total edges in the graph
@@ -121,8 +114,6 @@ print(f"  Intra-cluster edges (within clusters): {intra_cluster_edges:,} ({100*i
 print(f"  Inter-cluster edges (between clusters): {inter_cluster_edges:,} ({100*inter_cluster_edges/total_edges:.1f}%)")
 print(f"  Edges with unclustered nodes: {unclustered_edges:,} ({100*unclustered_edges/total_edges:.1f}%)")
 
-# Simplified Modularity: (intra-cluster edges) / (total edges)
-# Note: This is a simplified version. True modularity considers degree distribution.
 simple_modularity = intra_cluster_edges / total_edges
 print(f"\nSimplified Modularity Score: {simple_modularity:.4f}")
 
@@ -135,12 +126,10 @@ elif simple_modularity > 0.15:
 else:
     print("✗ WEAK: Poor cluster separation")
 
-# =========================================================
-# 3. CLUSTER COHESION
-# =========================================================
+# Cluster cohesion
 print("\n🔗 CLUSTER COHESION ANALYSIS")
 print("-" * 70)
-print("Measures how densely connected nodes are within each cluster")
+print("Measures internal connectivity density within clusters")
 
 # For each cluster, calculate internal edge density
 # (For performance, we'll analyze only the top 20 largest clusters)
@@ -171,21 +160,17 @@ for i, cluster_rep in enumerate(top_clusters[:5], 1):  # Show details for top 5
     print(f"   Internal edges: {internal_edges}")
     print(f"   Density: {density:.6f} ({100*density:.4f}%)")
 
-# =========================================================
-# 4. CLUSTER PURITY (If genres were available)
-# =========================================================
+# Cluster purity note
 print("\n\n📌 NOTE: CLUSTER PURITY")
 print("-" * 70)
 print("Cluster purity requires ground-truth labels (e.g., genres).")
 print("Since MusicBrainz genre data is sparse, we skip this metric.")
-print("However, the clusters are semantically meaningful based on sampling patterns.")
+print("However, clusters are semantically meaningful based on sampling patterns.")
 
-# =========================================================
-# 5. INTER-CLUSTER CONNECTION ANALYSIS
-# =========================================================
+# Inter-cluster connections
 print("\n\n🌉 INTER-CLUSTER CONNECTIONS (Bridge Artists)")
 print("-" * 70)
-print("Artists that connect different musical families")
+print("Artists that connect different musical communities")
 
 # Find edges between different clusters
 bridges = edges_with_clusters \
@@ -215,9 +200,7 @@ bridges_named = bridges \
 
 bridges_named.show(10, truncate=False)
 
-# =========================================================
-# 6. SAVE RESULTS
-# =========================================================
+# Save results
 print("\n💾 SAVING CLUSTER QUALITY REPORT")
 print("-" * 70)
 

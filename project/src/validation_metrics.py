@@ -1,11 +1,10 @@
+"""
+Music Graph Validation Metrics
+Calculates comprehensive statistics to validate data quality and understand network structure.
+"""
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, mean, stddev, count, min as _min, max as _max, expr
-
-# =========================================================
-# VALIDATION METRICS: GRAPH STATISTICS
-# =========================================================
-# This script calculates comprehensive statistics about the music graph
-# to validate data quality and understand the network structure.
 
 spark = SparkSession.builder \
     .appName("MusicGenealogy_Validation") \
@@ -16,20 +15,16 @@ print("=" * 70)
 print("MUSIC GRAPH VALIDATION METRICS")
 print("=" * 70)
 
-# Load the graph
 df_graph = spark.read.parquet("outputs/music_graph.parquet")
 df_graph.cache()
 
-# =========================================================
-# 1. BASIC GRAPH STATISTICS
-# =========================================================
+# Basic graph statistics
 print("\n📊 BASIC GRAPH STATISTICS")
 print("-" * 70)
 
 total_edges = df_graph.count()
 print(f"Total Sampling Events (Edges): {total_edges:,}")
 
-# Count unique nodes (artists and songs)
 total_songs = df_graph.select("source_song_id").union(
     df_graph.select("target_song_id")
 ).distinct().count()
@@ -40,18 +35,14 @@ total_artists = df_graph.select("Original_Artist_Name").union(
 ).distinct().count()
 print(f"Unique Artists: {total_artists:,}")
 
-# Average edges per artist
 avg_edges_per_artist = total_edges / total_artists
 print(f"Average Edges per Artist: {avg_edges_per_artist:.2f}")
 
-# Graph Density (for directed graph: edges / (nodes * (nodes-1)))
 density = total_edges / (total_songs * (total_songs - 1))
-print(f"Graph Density: {density:.6f} (Very sparse - typical for real-world networks)")
+print(f"Graph Density: {density:.6f} (Very sparse - typical for real networks)")
 
-# =========================================================
-# 2. IN-DEGREE DISTRIBUTION (Times Sampled)
-# =========================================================
-print("\n📈 IN-DEGREE DISTRIBUTION (How many times each artist was sampled)")
+# In-degree distribution
+print("\n📈 IN-DEGREE DISTRIBUTION (Times Sampled)")
 print("-" * 70)
 
 in_degree = df_graph.groupBy("Original_Artist_Name") \
@@ -69,7 +60,6 @@ print(f"Max In-Degree: {in_stats['max']}")
 print(f"Mean In-Degree: {in_stats['mean']:.2f}")
 print(f"Std Dev In-Degree: {in_stats['stddev']:.2f}")
 
-# Distribution bins
 print("\nIn-Degree Distribution:")
 in_degree.select(
     (col("in_degree") >= 1).alias("1+"),
@@ -85,10 +75,8 @@ in_degree.select(
     expr("SUM(CASE WHEN `100+` THEN 1 ELSE 0 END)").alias("Sampled 100+ times")
 ).show(truncate=False)
 
-# =========================================================
-# 3. OUT-DEGREE DISTRIBUTION (Samples Used)
-# =========================================================
-print("\n📉 OUT-DEGREE DISTRIBUTION (How many samples each artist used)")
+# Out-degree distribution
+print("\n📉 OUT-DEGREE DISTRIBUTION (Samples Used)")
 print("-" * 70)
 
 out_degree = df_graph.groupBy("Sampler_Artist_Name") \
@@ -105,8 +93,8 @@ print(f"Min Out-Degree: {out_stats['min']}")
 print(f"Max Out-Degree: {out_stats['max']}")
 print(f"Mean Out-Degree: {out_stats['mean']:.2f}")
 print(f"Std Dev Out-Degree: {out_stats['stddev']:.2f}")
+print(f"Max Out-Degree: {out_stats['max']}")
 
-# Distribution bins
 print("\nOut-Degree Distribution:")
 out_degree.select(
     (col("out_degree") >= 1).alias("1+"),
@@ -122,12 +110,10 @@ out_degree.select(
     expr("SUM(CASE WHEN `100+` THEN 1 ELSE 0 END)").alias("Used 100+ samples")
 ).show(truncate=False)
 
-# =========================================================
-# 4. POWER LAW CHECK (Scale-Free Network)
-# =========================================================
+# Power law analysis
 print("\n⚡ POWER LAW ANALYSIS")
 print("-" * 70)
-print("Checking if the network follows a power-law distribution (typical of social networks)")
+print("Checking if the network follows power-law distribution (scale-free network)")
 
 # Top 1% of nodes should have a disproportionate share of connections
 top_1_percent = max(1, int(total_artists * 0.01))
@@ -147,18 +133,16 @@ print(f"  Top 1% of artists ({out_top_sum['count']} artists) account for:")
 print(f"  {out_top_sum['sum']:,} / {total_edges:,} = {100*out_top_sum['sum']/total_edges:.1f}% of all sampling events")
 
 if (100*in_top_sum['sum']/total_edges) > 20:
-    print("\n✓ Network exhibits power-law characteristics (scale-free network)")
+    print("\n✓ Network exhibits power-law characteristics (scale-free)")
     print("  → A few 'hub' artists dominate the influence structure")
 else:
     print("\n✗ Network does NOT exhibit strong power-law characteristics")
 
-# =========================================================
-# 5. DATA QUALITY CHECKS
-# =========================================================
+# Data quality checks
 print("\n🔍 DATA QUALITY CHECKS")
 print("-" * 70)
 
-# Check for self-loops (artists sampling themselves)
+# Check for self-loops
 self_loops = df_graph.filter(
     col("source_song_id") == col("target_song_id")
 ).count()
@@ -182,11 +166,9 @@ duplicate_edges = df_graph.groupBy("source_song_id", "target_song_id") \
     .agg(count("*").alias("cnt")) \
     .filter(col("cnt") > 1) \
     .count()
-print(f"Duplicate edges (same source -> target): {duplicate_edges}")
+print(f"Duplicate edges: {duplicate_edges}")
 
-# =========================================================
-# 6. SAVE SUMMARY REPORT
-# =========================================================
+# Save summary
 print("\n💾 SAVING VALIDATION REPORT")
 print("-" * 70)
 
