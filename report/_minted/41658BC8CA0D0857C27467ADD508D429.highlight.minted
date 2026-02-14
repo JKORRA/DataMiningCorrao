@@ -1,0 +1,13 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+        \PYG{n}{recording\PYGZus{}schema} \PYG{o}{=} \PYG{n}{StructType}\PYG{p}{(}\PYG{p}{[}
+            \PYG{n}{StructField}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{id}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{IntegerType}\PYG{p}{(}\PYG{p}{)}\PYG{p}{,} \PYG{k+kc}{True}\PYG{p}{)}\PYG{p}{,}
+            \PYG{n}{StructField}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{gid}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{StringType}\PYG{p}{(}\PYG{p}{)}\PYG{p}{,} \PYG{k+kc}{True}\PYG{p}{)}\PYG{p}{,}
+            \PYG{n}{StructField}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{name}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{StringType}\PYG{p}{(}\PYG{p}{)}\PYG{p}{,} \PYG{k+kc}{True}\PYG{p}{)}\PYG{p}{,}
+            \PYG{n}{StructField}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{artist\PYGZus{}credit}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{IntegerType}\PYG{p}{(}\PYG{p}{)}\PYG{p}{,} \PYG{k+kc}{True}\PYG{p}{)}\PYG{p}{,}
+            \PYG{n}{StructField}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{length}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{IntegerType}\PYG{p}{(}\PYG{p}{)}\PYG{p}{,} \PYG{k+kc}{True}\PYG{p}{)}\PYG{p}{,}
+            \PYG{n}{StructField}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{comment}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{StringType}\PYG{p}{(}\PYG{p}{)}\PYG{p}{,} \PYG{k+kc}{True}\PYG{p}{)}\PYG{p}{,}
+            \PYG{n}{StructField}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{edits\PYGZus{}pending}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{IntegerType}\PYG{p}{(}\PYG{p}{)}\PYG{p}{,} \PYG{k+kc}{True}\PYG{p}{)}\PYG{p}{,}
+            \PYG{n}{StructField}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{last\PYGZus{}updated}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{StringType}\PYG{p}{(}\PYG{p}{)}\PYG{p}{,} \PYG{k+kc}{True}\PYG{p}{)}\PYG{p}{,}
+            \PYG{n}{StructField}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{video}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{,} \PYG{n}{StringType}\PYG{p}{(}\PYG{p}{)}\PYG{p}{,} \PYG{k+kc}{True}\PYG{p}{)}
+        \PYG{p}{]}\PYG{p}{)}
+\end{MintedVerbatim}

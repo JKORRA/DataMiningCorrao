@@ -1,0 +1,5 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+    \PYG{n}{df\PYGZus{}graph} \PYG{o}{=} \PYG{n}{df\PYGZus{}graph}\PYG{o}{.}\PYG{n}{filter}\PYG{p}{(}
+        \PYG{n}{col}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{Sampler\PYGZus{}Artist\PYGZus{}Name}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)} \PYG{o}{!=} \PYG{n}{col}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{Original\PYGZus{}Artist\PYGZus{}Name}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}
+    \PYG{p}{)}
+\end{MintedVerbatim}

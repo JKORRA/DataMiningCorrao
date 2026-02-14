@@ -1,0 +1,33 @@
+================================================================================
+MUSIC GENEALOGY PROJECT - STATISTICS SUMMARY
+================================================================================
+
+GRAPH STRUCTURE
+--------------------------------------------------------------------------------
+Total Sampling Events (Edges): 20,728
+Unique Songs (Nodes): 28,283
+Unique Artists: 13,455
+  - Artists Who Sample: 6,409
+  - Artists Being Sampled: 8,066
+Graph Density: 0.00002591
+
+IN-DEGREE STATISTICS (Times Sampled)
+--------------------------------------------------------------------------------
+Mean: 2.57
+Std Dev: 5.55
+Maximum: 183
+
+OUT-DEGREE STATISTICS (Samples Used)
+--------------------------------------------------------------------------------
+Mean: 3.23
+Std Dev: 11.35
+Maximum: 439
+
+POWER-LAW ANALYSIS (Concentration)
+--------------------------------------------------------------------------------
+Top 1% of artists control: 16.6% of sampling events
+Top 5% of artists control: 36.8% of sampling events
+Top 10% of artists control: 48.7% of sampling events
+
+This confirms the network exhibits scale-free (power-law) characteristics,
+typical of real-world social and influence networks.

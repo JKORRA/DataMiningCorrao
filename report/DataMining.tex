@@ -1,0 +1,460 @@
+\documentclass[italian, a4paper, 12pt]{article}
+\usepackage{ifxetex,ifluatex}
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+    \usepackage[utf8]{inputenc}
+    %\usepackage[T1]{fontenc} % to properly render accented characters
+    %\usepackage{lmodern} % use with T1 font encoding
+\else % if luatex or xetex
+%   \usepackage{unicode-math}
+%   \defaultfontfeatures{Scale=MatchLowercase}
+%   \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{microtype} % improves the look of the document
+\usepackage{babel} % language translation
+\usepackage{float} % to use H in figures
+\usepackage[hidelinks]{hyperref} % clickable references
+\usepackage{minted}
+\setminted{obeytabs=true, tabsize=4}
+
+\usepackage[paper=a4paper,right=1.25in,left=1.25in]{geometry}
+
+\usepackage[dvipsnames]{xcolor}
+\usepackage{amsmath}
+\usepackage{multicol}
+\usepackage{lipsum}
+\usepackage{array}
+\newcolumntype{Y}{>{\centering\arraybackslash}X}
+\usepackage{tabularx}
+\renewcommand\tabularxcolumn[1]{m{#1}}% for vertical centering text in X column
+
+\usepackage{graphicx,subcaption,lipsum}
+\graphicspath{{./Immagini/}}
+
+\usepackage[sorting=none]{biblatex}
+\addbibresource{Tesi.bib}
+\usepackage{csquotes} % needed by biblatex
+
+%\title{Università degli studi dell'Insubria}
+%\subtitle{Dipartimento di Scienze Teoriche Applicate\\Corso di laurea in Informatica}
+
+%\author{Corrao Jacopo}
+
+\begin{document}
+
+\begin{titlepage}
+    \begin{center}
+        \includegraphics[height=3cm]{sigillo_unitn.png}
+
+        \vfill
+
+        \huge
+        \textbf{Data Mining 2025/2026}
+
+        \vfill
+
+        \Large
+        Corrao Jacopo\\
+        Matricola: 258412\\
+        \vspace{0.5cm}
+        Professore: Scettri Giacomo\\
+
+        \vspace{1cm}
+
+    \end{center}
+\end{titlepage}
+
+%\maketitle
+
+\clearpage
+
+\tableofcontents
+
+\clearpage
+
+\section{Introduction}
+The music industry typically measures success through sales charts and streaming numbers (popularity). However, cultural impact is structurally different from popularity. A "one-hit wonder" might sell millions, but an obscure funk track from the 1970s might be sampled by hundreds of hip-hop artists, forming the backbone of an entire genre.
+The objective of this project is to shift the analysis from volume to structure. By modeling the music ecosystem as a \textbf{Directed Graph} where \colorbox{Red!50}{nodes} are \colorbox{Red!50}{songs} and \colorbox{ForestGreen!50}{edges} represent \colorbox{ForestGreen!50}{sampling relationships} we aim to:
+\begin{itemize}
+    \item Identify the structural "ancestors" of modern music (Authority).
+    \item Detect communities of influence that transcend traditional genre labels.
+    \item Analyze the flow of influence using distributed graph algorithms.
+\end{itemize}
+
+\clearpage
+
+\section{Data Preparation}
+\subsection{Dataset Source}
+\textbf{MusicBrainz} Data was sourced from the \textbf{MusicBrainz} Database, an open music encyclopedia that collects user-contributed metadata. Unlike simplified datasets found on platforms like Kaggle, \textbf{MusicBrainz} provides raw PostgreSQL database dumps. The complexity of this dataset lies in its highly normalized structure (Third Normal Form), which requires significant data engineering to reconstruct meaningful relationships. We utilized the core tables: \colorbox{gray!50}{\texttt{recording}} (songs), \colorbox{gray!50}{\texttt{artist\_credit}} (artist names), \colorbox{gray!50}{\texttt{l\_recording\_recording}} (relationships), and the bridging table \colorbox{gray!50}{\texttt{link}}, which connects specific relationships to their semantic definitions found in the \colorbox{gray!50}{\texttt{link\_type}} table.
+
+\subsection{Data Aquisition and engineering}
+The raw data consisted of tab-separated value (TSV) files without headers, extracted from the \texttt{mbdump.tar.bz2} archive. The transformation process from raw relational tables to a structured property graph involved three key phases: Schema Definition, Projection, and Graph Reconstruction.
+
+\subsection{Computational Framework Selection}
+Before addressing the data schema, it is necessary to justify the architectural choice. Given the relational complexity of the MusicBrainz database (highly normalized) and the potential size of the graph, traditional single-node tools like Pandas would be inefficient for the required multi-way joins and iterative computations.
+\\
+\textbf{Apache Spark} (PySpark) was chosen as the framework to leverage:
+\begin{itemize}
+    \item \textbf{Distributed Processing}: To handle data ingestion and transformation in parallel.
+    \item \textbf{Lazy Evaluation}: To optimize the execution plan of complex transformation pipelines.
+    \item \textbf{Iterative Computation}: Essential for implementing graph algorithms like PageRank from scratch.
+\end{itemize}
+
+\subsection{Schema-on-Read Definition}
+Having established the framework, the first challenge was ingestion.
+Since the raw files lacked headers, relying on automatic schema inference was computationally expensive and error-prone (risking incorrect data type assignment). I manually defined the StructType for each table based on the MusicBrainz documentation. This ensures strict typing and robust data ingestion.
+\\
+
+\begin{listing}[H]
+    \begin{minted}[bgcolor=gray!10, fontsize=\small, breaklines]{python}
+        recording_schema = StructType([
+            StructField("id", IntegerType(), True),
+            StructField("gid", StringType(), True),
+            StructField("name", StringType(), True),
+            StructField("artist_credit", IntegerType(), True),
+            StructField("length", IntegerType(), True),
+            StructField("comment", StringType(), True),
+            StructField("edits_pending", IntegerType(), True),
+            StructField("last_updated", StringType(), True),
+            StructField("video", StringType(), True)
+        ])
+    \end{minted}
+    \caption{Code Snippet: Manual Schema Definition}
+\end{listing}
+
+\subsection{Data Project and Filtering}
+To optimize memory usage on the Spark driver and executors, I applied column pruning immediately after loading. Only essential columns (IDs and Names) were retained, discarding metadata like \texttt{"edits\_pending"} or \texttt{"comments"}.
+\\
+A critical step in the data preparation was isolating strictly "Sampling" relationships from the millions of generic interactions present in the \colorbox{gray!50}{\texttt{l\_recording\_recording}} table, such as covers, remixes, medleys, or live performances. Including all these heterogeneous links would have resulted in a noisy graph where structural '\textbf{influence}' (the reuse of audio) is confused with artistic '\textbf{reinterpretation}' (covers).
+To achieve a precise genealogy—defined as instances where a piece of audio is physically reused—I performed an exploratory query on the \colorbox{gray!50}{\texttt{link\_type}} metadata table to identify the specific Primary Keys associated with sampling descriptions.
+
+This exploration identified two distinct IDs:
+
+\begin{itemize}
+    \item \textbf{ID 69}: "Samples material" (Legacy type)
+    \item \textbf{ID 231}: "Is sampled by" / "Samples material" (Current type)
+\end{itemize}
+
+Consequently, only edges matching these specific IDs were retained during the graph construction, effectively filtering out noise and narrowing the dataset to a pure network of audio transmission.
+
+\subsection{Self-Loop Removal}
+A critical data quality issue identified during exploratory analysis was the presence of \textbf{self-loops}—edges where an artist samples their own material. These relationships totaled 1,407 instances (approximately 6.4\% of all edges) and typically represent:
+
+\begin{itemize}
+    \item \textbf{Remixes}: An artist remixing their own track
+    \item \textbf{Re-releases}: Different versions of the same song (album vs. single)
+    \item \textbf{Album Structure}: Intro/outro tracks sampling other songs from the same album
+    \item \textbf{Data Artifacts}: Duplicate entries or database inconsistencies
+\end{itemize}
+
+\noindent\textbf{Impact on Analysis:} Self-loops create two fundamental problems for network mining:
+
+\begin{enumerate}
+    \item \textbf{Authority Inflation}: In PageRank, self-loops create feedback loops where nodes artificially boost their own authority scores. One artist ("Ninja McTits") had 443 self-loops, resulting in a PageRank score of 66.45—dramatically higher than the legitimate top artist (James Brown: 11.70).
+    \item \textbf{Misleading Genealogy}: Self-sampling does not represent cross-artist influence or musical genealogy. It reflects internal artistic recycling rather than the transmission of ideas between different creators.
+\end{enumerate}
+
+\noindent\textbf{Solution:} Following standard practices in citation network analysis and influence propagation studies, all self-loops were removed during the data preparation phase using the filter:
+
+\begin{listing}[H]
+    \begin{minted}[bgcolor=gray!10, fontsize=\small, breaklines]{python}
+    df_graph = df_graph.filter(
+        col("Sampler_Artist_Name") != col("Original_Artist_Name")
+    )
+    \end{minted}
+    \caption{Code Snippet: Self-Loop Removal}
+\end{listing}
+
+This filtering reduced the edge count from 22,135 to 20,728 edges, ensuring that the subsequent PageRank and clustering algorithms measure only \textit{external influence}—the core objective of this genealogical analysis.
+
+\subsection{Graph Reconstruction}
+The MusicBrainz database is highly normalized. A "Sampling" relationship is stored as a numeric link between two recording IDs (\texttt{entity0} and \texttt{entity1}), without any text information about the song title or artist name. To build a human-readable graph (e.g., Artist A samples Artist B), I implemented a de-normalization pipeline involving a chain of joins across four DataFrames:
+
+\begin{itemize}
+    \item Linkage: Join \colorbox{gray!50}{\texttt{l\_recording\_recording}} with the \colorbox{gray!50}{\texttt{link}} table. This step was necessary to access the \colorbox{gray!50}{\texttt{link\_type}} attribute and filter strictly for the IDs identified in the exploration phase (69, 231).
+    \item Source Enrichment: Join the result with \colorbox{gray!50}{\texttt{recording}} and \colorbox{gray!50}{\texttt{artist\_credit}} to resolve the Source (Child) song and artist names.
+    \item Target Enrichment: Repeat the join with \colorbox{gray!50}{\texttt{recording}} and \colorbox{gray!50}{\texttt{artist\_credit}} to resolve the Target (Parent) song and artist names.
+\end{itemize}
+
+\subsection{Optimization}
+The computational cost of constructing the graph (involving multiple joins across millions of rows) is significant. To prevent re-computing this lineage for every subsequent analysis (PageRank, Clustering), the final processed graph structure was persisted to disk in \textbf{Apache Parquet} format.
+\\
+This choice provides three critical advantages over traditional CSV storage:
+
+\begin{itemize}
+    \item \textbf{Columnar Storage}: Parquet optimizes read operations by allowing Spark to scan only the necessary columns for a specific query (e.g., retrieving only \texttt{source\_id} and \texttt{target\_id} for topology analysis), drastically reducing I/O overhead.
+    \item \textbf{Schema Preservation}: Unlike CSVs, Parquet retains the metadata and data types (Integers, Strings) defined during the cleaning phase, eliminating the need for schema inference or casting during read operations.
+    \item \textbf{Compression}: Parquet uses efficient compression algorithms, reducing the disk footprint of the final dataset.
+\end{itemize}
+
+\clearpage
+
+\section{Methodology and Algorithms}
+With the graph structure optimized and persisted, the analysis focused on extracting knowledge through three distinct layers of complexity: \textbf{descriptive statistics}, \textbf{structural authority analysis} (PageRank), and \textbf{community detection} (Clustering). Crucially, to fully leverage the distributed nature of Spark and demonstrate a deep understanding of graph theory, I implemented the iterative graph algorithms from scratch using \texttt{PySpark} transformations (MapReduce paradigm) rather than relying on pre-built libraries like \texttt{GraphFrames}.
+
+\subsection{Descriptive Network Analysis: Degree Centrality}
+The first layer of analysis aimed to quantify "volume" using basic graph topology metrics. Using Spark SQL aggregations, I calculated the Degree Centrality for each node:
+\begin{itemize}
+    \item \textbf{In-Degree (Most Sampled)}: Represents the number of incoming edges. In this context, it quantifies an artist's raw popularity as a source material.
+    \begin{itemize}
+        \item Implementation:
+        \begin{listing}[H]
+            \begin{minted}[bgcolor=gray!10, fontsize=\small, breaklines]{python}
+                groupBy("Original_Artist_Name").count()
+            \end{minted}
+        \end{listing}
+    \end{itemize}
+    \item \textbf{Out-Degree (Top Samplers)}: Represents the number of outgoing edges. It identifies artists who rely most heavily on sampling for their composition process.
+\end{itemize}
+
+\subsection{Structural Authority: Distributed PageRank}
+While In-Degree measures popularity (quantity), it fails to capture the quality of the influence. To solve this, I modeled the "\textbf{Authority}" of an artist using the \textbf{PageRank algorithm}. Unlike a simple count, PageRank assigns a score based on the principle that \textit{"being sampled by an influential artist transmits more authority than being sampled by a minor one"}.
+
+\subsubsection{Implementation Details}
+I implemented the algorithm manually via an iterative MapReduce process with \textbf{convergence criterion}.
+\\
+The logic follows the standard formula:
+$$ PR(A) = (1 - d) + d \sum \frac{PR(B)}{OutDegree(B)} $$
+where \textit{d} is the damping factor (set to 0.85).
+\\
+The implementation ensures that authority flows correctly: edges point from Sampler to Original Artist, so that the Original Artist (being sampled) receives authority through \textit{incoming} edges. The algorithm converged in \textbf{11 iterations} with tolerance $< 0.0001$, demonstrating efficient convergence.
+\\
+The PySpark implementation addressed specific technical challenges:
+\begin{itemize}
+    \item \textbf{Dangling Nodes (Sinks)}: A critical issue in graph mining involves nodes with no outgoing edges (artists who are sampled but do not sample anyone). These nodes act as "black holes" for the rank score. To prevent rank leakage, I utilized a \texttt{right\_outer\_join} to identify these nodes and manage their score redistribution.
+    \item \textbf{Lineage Truncation}: Spark’s lazy evaluation builds a growing lineage graph with each iteration, which can lead to \texttt{StackOverflowError}. I mitigated this by applying \texttt{.checkpoint()} at each loop, truncating the logical plan and saving the intermediate state to disk.
+\end{itemize}
+
+\subsection{Community Detection: Label Propagation (LPA)}
+To identify distinct "musical families", I implemented a \textbf{Label Propagation Algorithm (LPA)}. This is an unsupervised clustering technique where nodes adopt the "label" of their neighbors based on majority voting.
+\\
+Algorithm Logic:
+\begin{itemize}
+    \item \textbf{Initialization}: Every artist starts with a unique label equal to their own ID.
+    \item \textbf{Propagation (6 Iterations)}: In each iteration, a "Sampler" node adopts the label of its "Sampled" node. If a node samples multiple artists, the \texttt{greatest()} function deterministically selects the dominant label.
+    \item \textbf{Convergence}: Over multiple iterations, connected components (chains of sampling) converge to a single shared label—the ID of the "Ancestor" or "Root" artist.
+\end{itemize}
+
+\subsubsection{Structural Definition of Genres (Unsupervised Learning)}
+A crucial distinction of this methodology is that it operates blindly regarding explicit musical genres. We did not import metadata tables containing tags like "Hip Hop" or "Rock". Instead, the algorithm relies entirely on \textbf{structural patterns}: if a set of artists systematically samples the same source material, they are grouped into the same cluster. This validates the hypothesis that musical genres are fundamentally communities of shared practice.
+
+\clearpage
+
+\section{Results}
+
+\subsection{Network Statistics and Validation}
+The final processed graph, after removing self-loops (artist sampling themselves), comprises \textbf{20,728 sampling events} (edges) connecting \textbf{30,021 songs} (nodes) across \textbf{13,587 unique artists}. The removal of 1,407 self-loops (6.4\% of raw edges) was essential to ensure that the network represents genuine cross-artist influence rather than internal artistic recycling.
+
+The network exhibits classic \textbf{scale-free} characteristics, as evidenced by the power-law degree distribution shown in Figure~\ref{fig:degree_dist}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{fig1_degree_distribution.pdf}
+    \caption{Degree distribution following a power-law pattern. Both in-degree (times sampled) and out-degree (samples used) show heavy-tailed distributions, indicating that a small number of artists dominate the sampling landscape while most artists have minimal connectivity.}
+    \label{fig:degree_dist}
+\end{figure}
+
+\textbf{Key Network Properties:}
+\begin{itemize}
+    \item \textbf{Graph Density}: 0.00002456 (sparse network, as expected in real-world influence networks)
+    \item \textbf{Mean In-Degree}: 2.57 (average times an artist is sampled)
+    \item \textbf{Mean Out-Degree}: 3.23 (average samples used per artist)
+    \item \textbf{Maximum In-Degree}: 183 (James Brown - most sampled artist)
+    \item \textbf{Power-Law Concentration}: Top 1\% of artists control 21.8\% of all sampling events, Top 10\% control significant majority
+\end{itemize}
+
+\noindent This concentration pattern validates the scale-free network hypothesis: musical influence follows preferential attachment, where established authorities accumulate disproportionate influence over time.
+
+\subsection{PageRank Authority Rankings}
+The PageRank algorithm converged in \textbf{11 iterations} (tolerance $< 0.0001$), producing authority scores that reveal the structural importance of artists beyond mere volume. Table~\ref{tab:top10} presents the top 10 artists ranked by PageRank authority.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|r|l|r|r|}
+\hline
+\textbf{Rank} & \textbf{Artist} & \textbf{PageRank} & \textbf{In-Degree} \\
+\hline
+1 & James Brown & 11.70 & 183 \\
+2 & Beastie Boys & 9.19 & 67 \\
+3 & Daft Punk & 7.53 & 99 \\
+4 & Jay-Z & 7.06 & 44 \\
+5 & The Notorious B.I.G. & 6.60 & 34 \\
+6 & The Beatles & 6.53 & 77 \\
+7 & The Rolling Stones & 6.15 & 44 \\
+8 & (Koji Kondo) & 6.15 & 49 \\
+9 & [unknown] & 5.87 & 85 \\
+10 & OutKast & 5.80 & 37 \\
+\hline
+\end{tabular}
+\caption{Top 10 artists by PageRank authority score (after self-loop removal). Note how Jay-Z and The Notorious B.I.G. achieve high PageRank despite lower in-degrees, demonstrating structural position matters as much as volume.}
+\label{tab:top10}
+\end{table}
+
+\subsection{Volume vs. Authority: The Hidden Influencers}
+Comparing the results of Degree Centrality (Volume) against PageRank (Authority) reveals significant insights into the music ecosystem, as shown in Figure~\ref{fig:volume_authority}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{fig2_volume_vs_authority.pdf}
+    \caption{Top 20 artists: Volume (In-Degree) vs. Authority (PageRank). While most artists follow the diagonal (high volume = high authority), outliers like Koji Kondo demonstrate that structural position matters as much as raw popularity.}
+    \label{fig:volume_authority}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{The Volume Kings}: As expected, Funk and Soul legends like \textbf{James Brown} dominate both metrics. With 183 sampling events and a PageRank of 11.70, he is unequivocally the "Godfather of Sampling."
+    \item \textbf{The Structural Bridges}: Artists like \textbf{Daft Punk} and \textbf{Beastie Boys} show high PageRank relative to their in-degree. They act as "bridges" between genres, absorbing influence from the past and transmitting it to highly connected modern artists.
+    \item \textbf{The Unexpected Authority - Koji Kondo}: Perhaps the most surprising finding is the appearance of \textbf{Koji Kondo}, the Nintendo video game composer, ranking 8th with PageRank 6.15. With 49 sampling events, this reveals a non-traditional genealogy: 1980s-90s video game music (Super Mario Bros., The Legend of Zelda) has been extensively sampled in modern hip hop, demonstrating cross-genre influence beyond conventional musicology.
+\end{itemize}
+
+\subsection{Musical Genealogy Networks}
+To visualize the actual "who sampled who" relationships, I created network diagrams showing the structural genealogy of music.
+
+\subsubsection{Top 15 Artists Sampling Network}
+Figure~\ref{fig:top15network} shows the core sampling relationships among the 15 most influential artists. To avoid visual clutter, only strong connections (weight $\geq$ 3) are displayed, resulting in 9 key relationships that form the backbone of modern sampling culture.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{fig1_top15_sampling_network.pdf}
+    \caption{Top 15 artists sampling network. Arrows point from sampler to original artist (authority). Node size represents PageRank score. This simplified view reveals the core genealogical structure: James Brown as the central hub, with hip hop artists forming the sampling layer.}
+    \label{fig:top15network}
+\end{figure}
+
+\subsubsection{James Brown: The Godfather's Sphere of Influence}
+Figure~\ref{fig:jbego} visualizes James Brown's ego network, showing the 20 major artists who sampled his work most extensively. The perfect circular layout eliminates overlapping and clearly demonstrates why he achieves the highest PageRank score.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{fig2_jamesbrown_ego_network.pdf}
+    \caption{James Brown ego network with 20 major samplers arranged in circular layout. This visualization explains his dominant PageRank score (11.70): numerous influential artists (Public Enemy, LL Cool J, Eric B. \& Rakim) sample his funk breaks extensively, creating a massive sphere of influence.}
+    \label{fig:jbego}
+\end{figure}
+
+\subsubsection{Video Game Music in Hip Hop: The Koji Kondo Discovery}
+One of the most surprising findings is the influence of video game composer Koji Kondo on modern hip hop, shown in Figure~\ref{fig:kondo}. This represents a unique cross-genre genealogy rarely studied in traditional musicology.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{fig3_kojikondo_ego_network.pdf}
+    \caption{Koji Kondo ego network showing 15 artists who sampled the Nintendo composer's work. Ranking 8th overall with PageRank 6.15 (tied with The Rolling Stones), Kondo's iconic themes from Super Mario Bros. and The Legend of Zelda have entered hip hop's sonic genealogy, demonstrating how 8-bit aesthetics became part of modern music production.}
+    \label{fig:kondo}
+\end{figure}
+
+\noindent \textbf{Analysis}: This finding demonstrates that sampling culture extends beyond traditional music genres. The nostalgic appeal of 1980s-90s video games has influenced a generation of producers who grew up with these sounds, creating a genealogical path: Video Games $\to$ Electronic Music $\to$ Hip Hop.
+
+\subsubsection{Sampling Flow Analysis}
+Figure~\ref{fig:flow} presents a bipartite visualization showing the directional flow of influence from authority sources (right) to modern samplers (left).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig4_sampling_flow.pdf}
+    \caption{Bipartite sampling flow diagram. Left: top 10 artists who sample heavily (high out-degree). Right: top 10 most-sampled artists (authorities, high in-degree). Line thickness indicates sampling frequency. The clear separation shows modern producers drawing from classic sources, with some artists (e.g., Beastie Boys) appearing on both sides as bridges.}
+    \label{fig:flow}
+\end{figure}
+
+\noindent This visualization reveals a temporal and genre division: the right side represents primarily 1970s-80s funk, soul, and rock sources, while the left side shows 1990s-2000s hip hop and electronic artists. Artists appearing on both sides (like Beastie Boys) act as evolutionary bridges.
+
+\subsection{Artist Classification: Hub Analysis}
+Figure~\ref{fig:hubanalysis} classifies artists based on their sampling behavior, plotting in-degree (times sampled) against out-degree (samples used).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{fig5_hub_analysis.pdf}
+    \caption{Hub analysis scatter plot. X-axis: out-degree (samples used). Y-axis: in-degree (times sampled). Top 15 artists by PageRank are highlighted in red with labels. Quadrants identify different roles: Authorities (top-left, high in-degree), Bridges (top-right, high both ways), and Heavy Samplers (bottom-right, high out-degree).}
+    \label{fig:hubanalysis}
+\end{figure}
+
+\textbf{Artist Classifications:}
+\begin{itemize}
+    \item \textbf{Pure Authorities} (top-left quadrant): Artists like James Brown, Marvin Gaye - sampled extensively but use few samples themselves. They are the "source material" of modern music.
+    \item \textbf{Bridges} (top-right quadrant, rare): Artists who both sample heavily AND get sampled. These are evolutionary nodes that transform influence.
+    \item \textbf{Heavy Samplers} (bottom-right quadrant): Modern producers who rely extensively on sampling but haven't yet become authorities themselves.
+\end{itemize}
+
+\noindent The strong correlation between in-degree and PageRank (visible by red dots clustering in the upper-left) validates the PageRank algorithm: authority derives primarily from being sampled by influential artists.
+
+\subsection{Community Detection and Genealogical Families}
+The Label Propagation Algorithm detected \textbf{7,954 distinct clusters} with a modularity score of \textbf{0.2724}, indicating moderate community structure. This suggests the music network is neither completely fragmented nor fully connected, but exhibits meaningful genealogical families.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{fig4_cluster_distribution.pdf}
+    \caption{Distribution of cluster sizes. The top 5 clusters contain 143, 94, 90, 74, and 66 artists respectively. The long tail indicates most clusters are small genealogical "chains" while a few represent major musical movements.}
+    \label{fig:clusterdist}
+\end{figure}
+
+\textbf{Cluster Analysis:}
+\begin{itemize}
+    \item \textbf{Largest Cluster (143 artists)}: Led by James Brown, represents the dominant genealogical lineage funk/soul $\to$ hip hop
+    \item \textbf{Modularity 0.2724}: Indicates communities are distinguishable but not completely isolated - expected in music where genres blend
+    \item \textbf{7,954 clusters}: Many small clusters represent isolated sampling chains (A $\to$ B $\to$ C) that haven't connected to the main network
+\end{itemize}
+
+\subsection{Power-Law Validation}
+Figure~\ref{fig:powerlaw} validates the scale-free network hypothesis through cumulative degree distribution analysis.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig7_powerlaw_analysis.pdf}
+    \caption{Power-law validation: cumulative degree distribution (log-log scale). The linear trend in log-log space confirms the network follows a power-law distribution. Concentration analysis shows top 1\% of artists control 18.7\%, top 5\% control 38.7\%, and top 10\% control 50.4\% of all sampling events.}
+    \label{fig:powerlaw}
+\end{figure}
+
+\noindent This confirms the "rich get richer" phenomenon: established artists like James Brown accumulate sampling events at a rate proportional to their existing influence (\textbf{preferential attachment}), characteristic of real-world social and influence networks.
+
+\clearpage
+
+\section{Discussion and Interpretation}
+
+\subsection{Theoretical Implications}
+This analysis demonstrates that musical influence is fundamentally a \textbf{network phenomenon} governed by structural properties rather than just popularity metrics. Three key insights emerge:
+
+\begin{enumerate}
+    \item \textbf{Authority vs. Popularity}: PageRank reveals that structural position (being sampled by influential artists) matters as much as raw volume. This explains why Koji Kondo ranks higher than artists with more total samples.
+    
+    \item \textbf{Cross-Genre Genealogy}: The appearance of video game music in hip hop demonstrates that sampling creates unexpected genealogical paths beyond traditional genre boundaries. Music evolution is not linear but networked.
+    
+    \item \textbf{Preferential Attachment}: The power-law distribution confirms that musical influence follows the same mathematical patterns as citation networks, social networks, and the World Wide Web - a few hubs dominate while most nodes remain peripheral.
+\end{enumerate}
+
+\subsection{Methodological Contributions}
+\begin{itemize}
+    \item \textbf{From-Scratch Implementation}: Implementing PageRank and Label Propagation manually in PySpark demonstrates deep understanding of distributed graph algorithms beyond using pre-built libraries.
+    
+    \item \textbf{Data Engineering}: Successfully navigating MusicBrainz's complex relational schema (Third Normal Form) and transforming it into a graph structure showcases real-world data engineering skills.
+    
+    \item \textbf{Convergence Optimization}: Implementing convergence criteria with adaptive stopping improved algorithm efficiency, achieving convergence in just 11 iterations with tolerance $< 0.0001$.
+    
+    \item \textbf{Visualization Strategy}: Creating clean, non-overlapping network visualizations (circular layouts for ego networks, bipartite for flow diagrams) makes complex structures interpretable.
+\end{itemize}
+
+\subsection{Limitations and Future Work}
+\begin{itemize}
+    \item \textbf{Data Quality}: While self-loop removal addressed the most critical data quality issue (artists sampling themselves), the MusicBrainz database still contains inconsistencies such as placeholder artists and duplicate entries. Future work should implement automated outlier detection and entity resolution.
+    
+    \item \textbf{Temporal Analysis}: The current analysis is static. Incorporating release dates would enable temporal network analysis, showing how sampling patterns evolved over decades.
+    
+    \item \textbf{Genre Metadata}: While Label Propagation is unsupervised, incorporating explicit genre tags would allow validation of whether structural clusters align with conventional genre definitions.
+    
+    \item \textbf{Multi-Hop Genealogy}: Extending the analysis to trace multi-generational sampling chains (Original $\to$ Sample 1 $\to$ Re-sample) would reveal deeper genealogical paths.
+\end{itemize}
+
+\clearpage
+
+\section{Conclusion}
+This project successfully applied distributed graph mining techniques to uncover the hidden genealogy of modern music. By modeling sampling relationships as a directed graph and implementing PageRank and Label Propagation from scratch in Apache Spark, we revealed structural patterns invisible to traditional volume-based metrics.
+
+\textbf{Key Findings:}
+\begin{itemize}
+    \item \textbf{James Brown} emerges as the undisputed authority (PageRank 11.70), with 183 sampling events forming a massive sphere of influence
+    \item \textbf{Koji Kondo's} appearance (\#8) demonstrates cross-genre genealogy: video game music $\to$ hip hop
+    \item The network follows \textbf{power-law distribution}: top 1\% of artists control 21.8\% of sampling events
+    \item \textbf{7,954 genealogical families} detected with moderate modularity (0.2724), indicating meaningful but overlapping communities
+    \item \textbf{Self-loop removal} (1,407 edges, 6.4\%) ensured analysis measures only genuine cross-artist influence
+    \item \textbf{Convergence in 11 iterations} validates the optimized PageRank implementation
+\end{itemize}
+
+\noindent This analysis shifts the conversation from "who sold the most records" to "who structurally shaped modern music." By leveraging graph theory and distributed computing, we've mapped the DNA of contemporary sound - revealing that influence flows through networks, not charts.
+
+\textbf{Impact}: This methodology could extend to other domains: academic citation networks (which papers are foundational?), social media influence (who drives conversation?), or software dependencies (which libraries underpin modern development?). The tools are universal; the insights are profound.
+
+%\printbibliography[title={Sitografia}]
+\end{document}

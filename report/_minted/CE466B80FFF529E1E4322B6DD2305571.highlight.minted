@@ -1,0 +1,3 @@
+\begin{MintedVerbatim}[commandchars=\\\{\}]
+                \PYG{n}{groupBy}\PYG{p}{(}\PYG{l+s+s2}{\PYGZdq{}}\PYG{l+s+s2}{Original\PYGZus{}Artist\PYGZus{}Name}\PYG{l+s+s2}{\PYGZdq{}}\PYG{p}{)}\PYG{o}{.}\PYG{n}{count}\PYG{p}{(}\PYG{p}{)}
+\end{MintedVerbatim}
