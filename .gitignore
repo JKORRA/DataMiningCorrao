@@ -1,0 +1,151 @@
+# ============================================
+# MUSIC GENEALOGY PROJECT - Git Ignore
+# ============================================
+
+# ============================================
+# LARGE DATA FILES (DO NOT COMMIT)
+# ============================================
+
+# MusicBrainz database dumps (too large, must be downloaded separately)
+dataset/mbdump/
+
+# Generated Parquet files (can be regenerated)
+dataset/outputs/*.parquet/
+dataset/outputs/**/*.parquet
+*.parquet/
+*.parquet
+
+# CSV outputs (regenerable)
+dataset/outputs/*.csv
+!dataset/outputs/README.md  # Keep README explaining how to regenerate
+
+# ============================================
+# SPARK & PYTHON
+# ============================================
+
+# Spark checkpoints (large temporary files)
+dataset/checkpoints/
+dataset/checkpoints_clustering/
+dataset/checkpoints_viz/
+
+# Python virtual environment
+dataset/venv/
+venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# ============================================
+# LATEX BUILD FILES
+# ============================================
+
+# Auxiliary files
+report/*.aux
+report/*.log
+report/*.out
+report/*.toc
+report/*.lof
+report/*.lot
+report/*.fls
+report/*.fdb_latexmk
+report/*.synctex.gz
+report/*.bbl
+report/*.blg
+report/*.bcf
+report/*.run.xml
+report/*.nav
+report/*.snm
+report/*.vrb
+
+# Minted cache
+report/_minted-*/
+
+# ============================================
+# GENERATED FIGURES (OPTIONAL - CHOOSE ONE)
+# ============================================
+
+# OPTION A: Exclude figures (small repo, must regenerate)
+# Uncomment these lines to exclude figures:
+# dataset/figures/
+# report/Immagini/*.png
+# report/Immagini/*.pdf
+
+# OPTION B: Include figures (larger repo, ready to view)
+# Leave commented to INCLUDE figures in repository
+
+# ============================================
+# SYSTEM FILES
+# ============================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# ============================================
+# IDE & EDITOR
+# ============================================
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+
+# ============================================
+# LOGS & TEMPORARY FILES
+# ============================================
+
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# Pipeline logs
+dataset/*.log
+
+# ============================================
+# KEEP THESE IMPORTANT FILES
+# ============================================
+
+# Always keep README files
+!README.md
+!*/README.md
+!HOWTO.md
+!SUBMISSION_CHECKLIST.md
+
+# Keep requirements and config
+!requirements.txt
+!run_pipeline.sh
+
+# Keep final report PDF
+!report/DataMining.pdf
