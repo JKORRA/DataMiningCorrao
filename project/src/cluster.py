@@ -1,5 +1,6 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, max as _max, count, first, lit, greatest
+from pyspark.sql.functions import col, max as _max, count, first, lit, when, rand, broadcast, row_number
+from pyspark.sql.window import Window
 
 spark = SparkSession.builder \
     .appName("MusicGenealogy_Clustering") \
@@ -11,7 +12,7 @@ spark.sparkContext.setCheckpointDir("checkpoints_clustering")
 print("Loading graph for clustering...")
 df_graph = spark.read.parquet("outputs/music_graph.parquet")
 
-# Verify self-loops were removed
+# Remove self-loops using Artist Names (GID column is unreliable)
 self_loops = df_graph.filter(col("Sampler_Artist_Name") == col("Original_Artist_Name")).count()
 if self_loops > 0:
     print(f"WARNING: Found {self_loops} self-loops! Removing them now...")
@@ -21,11 +22,10 @@ else:
 
 print(f"Graph loaded: {df_graph.count()} edges")
 
-# Create edges: child samples parent
-# Clustering groups artists who sample the same sources (shared influences)
+# Create edges: child samples parent (Artist-Level clustering)
 edges = df_graph.select(
-    col("source_song_id").alias("child"), 
-    col("target_song_id").alias("parent")
+    col("Sampler_Artist_Name").alias("child"), 
+    col("Original_Artist_Name").alias("parent")
 ).distinct()
 
 # Get all unique nodes
@@ -34,8 +34,8 @@ nodes = edges.select("child").union(edges.select("parent")).distinct()
 # Initialize: each node starts with its own ID as label
 labels = nodes.select(col("child").alias("id"), col("child").alias("label"))
 
-# Label Propagation Algorithm
-# Each node adopts the label of its most influential neighbor
+# Label Propagation Algorithm (LPA)
+# Each node adopts the majority label of its neighbors (Random tie-breaking)
 ITERATIONS = 6 
 print(f"Starting Label Propagation ({ITERATIONS} iterations)...")
 
@@ -46,36 +46,47 @@ for i in range(ITERATIONS):
     propagation = edges.join(labels, edges.parent == labels.id) \
                        .select(col("child"), col("label").alias("parent_label"))
     
-    # Each node considers both its current label and proposed labels
-    current_state = labels.alias("l").join(propagation.alias("p"), col("l.id") == col("p.child"), "left_outer") \
-        .select(
-            col("l.id"),
-            col("l.label").alias("old_label"),
-            col("p.parent_label").alias("new_proposal")
-        )
+    # Count frequency of each proposed label
+    prop_counts = propagation.groupBy("child", "parent_label").count()
     
-    # Adopt the maximum label among all proposals
-    labels = current_state.groupBy("id") \
-        .agg(_max(col("new_proposal")).alias("max_proposal"), first("old_label").alias("old")) \
-        .select(
-            col("id"),
-            greatest(col("max_proposal"), col("old")).alias("label") 
-        ).checkpoint()
+    # Find max count per child
+    max_counts = prop_counts.groupBy("child").agg(_max("count").alias("max_count"))
+    
+    # Join back to get all labels with the maximum count (the contenders)
+    contenders = prop_counts.join(max_counts, ["child"]) \
+                            .filter(col("count") == col("max_count")) \
+                            .select("child", "parent_label")
+    
+    # Random tie-breaking: use Window functions for distributed random selection
+    w = Window.partitionBy("child").orderBy("rand_val")
+    new_proposals = contenders.withColumn("rand_val", rand()) \
+                              .withColumn("rn", row_number().over(w)) \
+                              .filter(col("rn") == 1) \
+                              .select("child", col("parent_label").alias("new_proposal"))
+    
+    # Update state: adopt new proposal if it exists, otherwise keep old label
+    current_state = labels.alias("l").join(new_proposals.alias("p"), col("l.id") == col("p.child"), "left_outer")
+    
+    labels = current_state.select(
+        col("l.id").alias("id"),
+        when(col("p.new_proposal").isNull(), col("l.label")) \
+            .otherwise(col("p.new_proposal")).alias("label")
+    )
+    
+    if (i + 1) % 3 == 0:
+        labels = labels.checkpoint()
+    else:
+        labels = labels.cache()
 
 # Analyze resulting clusters
 print("Clustering complete. Aggregating results...")
 
-song_artist_map = df_graph.select(
-    col("target_song_id").alias("song_id"), 
-    col("Original_Artist_Name").alias("artist_name")
-).distinct()
-
-final_clusters = labels.join(song_artist_map, labels.label == song_artist_map.song_id) \
-    .select(
-        col("id").alias("song_id"),
-        col("label").alias("cluster_id"),
-        col("artist_name").alias("cluster_representative")
-    )
+# The label IS the cluster representative (an artist name)
+final_clusters = labels.select(
+    col("id").alias("artist_name"),
+    col("label").alias("cluster_id"),
+    col("label").alias("cluster_representative")
+)
 
 cluster_sizes = final_clusters.groupBy("cluster_representative") \
     .agg(count("*").alias("cluster_size")) \

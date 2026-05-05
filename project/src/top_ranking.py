@@ -17,7 +17,7 @@ df.cache()
 print("\n--- TOP 20 MOST SAMPLED ARTISTS ---")
 print("These artists are the most influential through being sampled by others")
 
-top_sampled = df.groupBy("Original_Artist_Name") \
+top_sampled = df.filter(col("Original_Artist_Name") != "[unknown]").groupBy("Original_Artist_Name") \
     .agg(count("*").alias("times_sampled")) \
     .orderBy(desc("times_sampled"))
 
@@ -27,7 +27,7 @@ top_sampled.show(20, truncate=False)
 print("\n--- TOP 20 SERIAL SAMPLERS ---")
 print("These artists use the most samples in their work (DJs and Producers)")
 
-top_samplers = df.groupBy("Sampler_Artist_Name") \
+top_samplers = df.filter(col("Sampler_Artist_Name") != "[unknown]").groupBy("Sampler_Artist_Name") \
     .agg(count("*").alias("samples_used")) \
     .orderBy(desc("samples_used"))
 

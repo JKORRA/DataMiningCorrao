@@ -1,0 +1,11 @@
+ground_truth,ground_truth_rank,matched_artist,system_rank,authority_score,match_score
+James Brown,1,James Brown,2,45.43545838428819,100
+Public Enemy,2,Public Enemy,56,11.62331819397528,100
+Run-D.M.C.,3,Run‐D.M.C.,34,15.375712966103352,100
+The Winstons,4,The Winstons,27,17.603796901889016,100
+Lyn Collins,5,Lyn Collins,8,27.06120028594773,100
+Kraftwerk,6,Kraftwerk,10,25.898278591228348,100
+Michael Jackson,7,Michael Jackson,13,22.97313227565014,100
+The Beatles,8,The Beatles,49,12.471630785324033,100
+The Notorious B.I.G.,9,The Notorious B.I.G.,52,12.223701214251852,100
+Madonna,10,Madonna,54,11.827668022848362,100

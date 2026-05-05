@@ -8,27 +8,30 @@ This directory contains all the source code, data processing scripts, and analys
 
 ```
 project/
-├── src/                    # Core analysis scripts (8 files)
+├── src/                    # Core analysis scripts (9 files)
 │   ├── data_preparation.py
 │   ├── top_ranking.py
 │   ├── compute_authority_manual.py
 │   ├── cluster.py
 │   ├── validation_metrics.py
 │   ├── cluster_quality.py
+│   ├── external_validation.py
 │   ├── generate_report_figures.py
 │   └── genealogy_visualizations.py
 │
-├── utils/                  # Utility scripts (2 files)
+├── utils/                  # Utility scripts (3 files)
 │   ├── analyze_selfloops.py
-│   └── visualize_cluster.py
+│   ├── visualize_cluster.py
+│   └── generate_interactive_network.py
 │
 ├── outputs/                # Analysis results (generated)
 │   ├── music_graph.parquet/
 │   ├── artist_pagerank.parquet/
 │   ├── music_labels.parquet/
 │   ├── validation_summary.csv/
-│   ├── cluster_quality_summary.csv/
-│   └── ... (9 files total)
+│   ├── external_validation.csv
+│   ├── interactive_genealogy.html
+│   └── ... (11 files total)
 │
 ├── figures/                # Generated visualizations
 │   ├── report_figures/    # 8 statistical plots
@@ -68,21 +71,21 @@ python3 src/compute_authority_manual.py
 ## 📄 Core Scripts Description
 
 ### Data Processing
-- **data_preparation.py** (5,251 bytes)
+- **data_preparation.py**
   - Loads MusicBrainz TSV files with manual schema
-  - Filters for pure "sampling" relationships (IDs: 69, 231)
-  - Removes self-loops (1,407 edges)
-  - Performs multi-table joins to construct graph
-  - Output: `outputs/music_graph.parquet/` (20,728 edges)
+  - Multiplex network: weighted edges for sampling, remix, mashup
+  - Temporal evolution: computes release year per recording
+  - Robust entity resolution: uses GIDs to remove self-loops
+  - Output: `outputs/music_graph.parquet/`
 
 ### Analysis Scripts
-- **top_ranking.py** (1,868 bytes)
+- **top_ranking.py**
   - Calculates in-degree and out-degree centrality
   - Identifies top sampled artists (volume metrics)
   
-- **compute_authority_manual.py** (5,713 bytes)
-  - Custom PageRank implementation (iterative MapReduce)
-  - Handles dangling nodes, lineage truncation
+- **compute_authority_manual.py**
+  - Artist-Level Weighted PageRank implementation
+  - Fixes mass leakage by redistributing dangling node (sink) ranks
   - Convergence criterion (tolerance: 0.0001)
   - Output: `outputs/artist_pagerank.parquet/`
   
@@ -96,11 +99,16 @@ python3 src/compute_authority_manual.py
   - Network statistics (density, degrees, components)
   - Output: `outputs/validation_summary.csv/`
   
-- **cluster_quality.py** (9,875 bytes)
+- **cluster_quality.py**
   - Modularity calculation
   - Cluster size distribution
   - Bridge analysis (inter-cluster connections)
   - Output: `outputs/cluster_quality_summary.csv/`
+
+- **external_validation.py**
+  - Validates PageRank scores against WhoSampled ground truth
+  - Computes Spearman Rank Correlation Coefficient
+  - Output: `outputs/external_validation.csv`
 
 ### Visualization
 - **generate_report_figures.py** (23,159 bytes)
@@ -114,13 +122,17 @@ python3 src/compute_authority_manual.py
   - Output: `figures/genealogy_networks/` (PNG + PDF)
 
 ### Utilities
-- **analyze_selfloops.py** (5,011 bytes)
+- **analyze_selfloops.py**
   - Detects and analyzes self-loop patterns
   - Used for data quality investigation
   
-- **visualize_cluster.py** (5,785 bytes)
+- **visualize_cluster.py**
   - Visualizes individual cluster structure
   - Helpful for exploratory analysis
+
+- **generate_interactive_network.py**
+  - D3.js force-directed graph of the top artists
+  - Output: `outputs/interactive_genealogy.html`
 
 ---
 
@@ -139,6 +151,8 @@ All analysis results are stored in `outputs/`:
 | top_100_artists_pagerank.csv/ | ~8KB | Top 100 artists by authority |
 | cluster_sizes.csv/ | ~200KB | Detailed cluster distribution |
 | cluster_bridges.csv/ | ~50KB | Inter-cluster connections |
+| external_validation.csv | ~1KB | Spearman correlation against ground truth |
+| interactive_genealogy.html | ~3MB | Interactive D3.js Network Explorer |
 
 ---
 

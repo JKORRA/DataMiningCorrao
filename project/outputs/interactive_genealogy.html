@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Genealogy Network</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0f0e17;
+            color: #fffffe;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            overflow: hidden;
+        }
+        #network { width: 100vw; height: 100vh; display: block; cursor: grab; }
+        #network:active { cursor: grabbing; }
+
+        /* Header bar */
+        .header {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 28px;
+            background: linear-gradient(180deg, rgba(15,14,23,0.95) 0%, rgba(15,14,23,0) 100%);
+            pointer-events: none;
+        }
+        .header h1 {
+            font-size: 18px; font-weight: 700; letter-spacing: -0.3px;
+            background: linear-gradient(135deg, #ff8906, #e53170);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            pointer-events: auto;
+        }
+        .header .hint {
+            font-size: 12px; color: rgba(255,255,255,0.4); pointer-events: auto;
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: absolute; pointer-events: none; opacity: 0;
+            padding: 12px 16px; border-radius: 10px;
+            background: rgba(30, 28, 46, 0.92);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            font-size: 13px; line-height: 1.5;
+            transition: opacity 0.15s ease;
+            max-width: 280px;
+        }
+        .tooltip b { color: #ff8906; }
+        .tooltip .score { color: rgba(255,255,255,0.5); font-size: 11px; }
+
+        /* Detail panel */
+        #detail-panel {
+            position: fixed; bottom: 20px; left: 20px; z-index: 10;
+            padding: 20px 24px; border-radius: 14px;
+            background: rgba(30, 28, 46, 0.88);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255,255,255,0.06);
+            box-shadow: 0 12px 48px rgba(0,0,0,0.5);
+            max-width: 340px; font-size: 13px;
+            transform: translateY(20px); opacity: 0;
+            transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+            pointer-events: none;
+        }
+        #detail-panel.visible {
+            transform: translateY(0); opacity: 1; pointer-events: auto;
+        }
+        #detail-panel h2 {
+            font-size: 16px; font-weight: 700; margin-bottom: 8px;
+            color: #ff8906;
+        }
+        #detail-panel .connections {
+            margin-top: 10px; max-height: 180px; overflow-y: auto;
+            scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent;
+        }
+        #detail-panel .conn-item {
+            padding: 4px 0; color: rgba(255,255,255,0.7); font-size: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        #detail-panel .conn-item span { color: rgba(255,255,255,0.3); }
+        #detail-panel .close-btn {
+            position: absolute; top: 12px; right: 14px;
+            background: none; border: none; color: rgba(255,255,255,0.3);
+            cursor: pointer; font-size: 16px;
+        }
+        #detail-panel .close-btn:hover { color: #fff; }
+
+        /* Legend */
+        .legend {
+            position: fixed; bottom: 20px; right: 20px; z-index: 10;
+            padding: 14px 18px; border-radius: 10px;
+            background: rgba(30, 28, 46, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.06);
+            font-size: 11px; color: rgba(255,255,255,0.5);
+        }
+        .legend div { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+        .legend .dot {
+            width: 10px; height: 10px; border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Music Genealogy Network</h1>
+        <span class="hint">Scroll to zoom · Drag to pan · Click a node to explore</span>
+    </div>
+    <div id="tooltip" class="tooltip"></div>
+    <div id="detail-panel">
+        <button class="close-btn" onclick="clearSelection()">✕</button>
+        <h2 id="detail-name"></h2>
+        <div id="detail-score"></div>
+        <div class="connections" id="detail-connections"></div>
+    </div>
+    <div class="legend">
+        <div><span class="dot" style="background:#ff8906"></span> High authority</div>
+        <div><span class="dot" style="background:#e53170"></span> Medium authority</div>
+        <div><span class="dot" style="background:#7f5af0"></span> Low authority</div>
+        <div style="margin-top:6px; font-size:10px;">Arrow: sampler → original</div>
+    </div>
+    <svg id="network"></svg>
+
+    <script>
+        const data = {"nodes": [{"id": "Daniel Ingram", "pagerank": 59.3798611779111}, {"id": "James Brown", "pagerank": 45.43545838428819}, {"id": "2Pac", "pagerank": 44.812766886075124}, {"id": "\u96fb\u97f3\u90e8", "pagerank": 38.52366068553597}, {"id": "\u5916\u795e\u7530\u6587\u82b8\u9ad8\u6821", "pagerank": 33.7654913182841}, {"id": "[unknown]", "pagerank": 32.134929647637776}, {"id": "Daft Punk", "pagerank": 27.155934104005993}, {"id": "Lyn Collins", "pagerank": 27.06120028594773}, {"id": "\u958b\u767a\u5ba4Pixel", "pagerank": 26.053088683967445}, {"id": "Kraftwerk", "pagerank": 25.898278591228348}, {"id": "John Lennon", "pagerank": 25.2695118982466}, {"id": "Toby Fox", "pagerank": 23.5974794350707}, {"id": "Michael Jackson", "pagerank": 22.97313227565014}, {"id": "GIRakaCHEEZER", "pagerank": 22.943672091290853}, {"id": "Yoko Ono", "pagerank": 22.493733123963153}, {"id": "The Honey Drippers", "pagerank": 21.148883429993326}, {"id": "Britney Spears", "pagerank": 20.168609693435755}, {"id": "ASAGEN", "pagerank": 19.712288758288217}, {"id": "C418", "pagerank": 19.283556000348245}, {"id": "Porter Robinson", "pagerank": 18.705281268005756}, {"id": "Isaac Hayes", "pagerank": 18.65725892977021}, {"id": "\u8fd1\u85e4\u6d69\u6cbb", "pagerank": 18.635759425767915}, {"id": "Nine Inch Nails", "pagerank": 18.5423602541539}, {"id": "Eminem", "pagerank": 18.441300270855198}, {"id": "Incredible Bongo Band", "pagerank": 18.22583374915281}, {"id": "Barry Manilow", "pagerank": 18.133708848138667}, {"id": "The Winstons", "pagerank": 17.603796901889016}, {"id": "Kool", "pagerank": 17.21983465165456}, {"id": "PSY", "pagerank": 17.040938779842534}, {"id": "Mel Torm\u00e9", "pagerank": 16.074304499767443}, {"id": "\u6298\u6238\u4f38\u6cbb", "pagerank": 16.06477671393735}, {"id": "\u6238\u8d8a\u307e\u3054\u3081", "pagerank": 15.883683639383754}, {"id": "Ye", "pagerank": 15.643925619103982}, {"id": "Run\u2010D.M.C.", "pagerank": 15.375712966103352}, {"id": "IOSYS", "pagerank": 15.292399298769562}, {"id": "JAY\u2010Z", "pagerank": 15.000758233649005}, {"id": "The Prodigy", "pagerank": 14.70838560083417}, {"id": "DJ TECHNORCH", "pagerank": 14.223887660545008}, {"id": "\u690e\u540d\u3082\u305f", "pagerank": 14.005704048763086}, {"id": "The Jacksons", "pagerank": 13.581266782933858}, {"id": "Beastie Boys", "pagerank": 13.3518412840761}, {"id": "Jim Jones", "pagerank": 13.281627397347338}, {"id": "Aphex Twin", "pagerank": 13.181854718870564}, {"id": "The Sugarhill Gang", "pagerank": 13.088405491699948}, {"id": "Justice", "pagerank": 13.005374113018796}, {"id": "Queen", "pagerank": 12.77480138809289}, {"id": "Prince", "pagerank": 12.770621392207818}, {"id": "Fatboy Slim", "pagerank": 12.665694475539748}, {"id": "The Beatles", "pagerank": 12.471630785324033}, {"id": "Katy Perry", "pagerank": 12.42629240081603}, {"id": "Eric B.", "pagerank": 12.378318347640182}, {"id": "The Notorious B.I.G.", "pagerank": 12.223701214251852}, {"id": "Beside", "pagerank": 11.859056109308934}, {"id": "Madonna", "pagerank": 11.827668022848362}, {"id": "Chic", "pagerank": 11.724743871788196}, {"id": "Public Enemy", "pagerank": 11.62331819397528}, {"id": "Mariah Carey", "pagerank": 11.619996526679829}, {"id": "SHIKI", "pagerank": 11.596549007497755}, {"id": "supercell", "pagerank": 11.587515938480168}, {"id": "Drake", "pagerank": 11.56464860664237}, {"id": "Depeche Mode", "pagerank": 11.397961835367374}, {"id": "Loleatta Holloway", "pagerank": 11.371361868483168}, {"id": "Pink Floyd", "pagerank": 11.264708259999667}, {"id": "Friendship", "pagerank": 11.220423798399977}, {"id": "\u5b87\u591a\u7530\u30d2\u30ab\u30eb", "pagerank": 11.182991560679588}, {"id": "Curtis Mayfield", "pagerank": 10.9799373910889}, {"id": "Dr. Dre", "pagerank": 10.964478651928504}, {"id": "Linkin Park", "pagerank": 10.932062328200846}, {"id": "anubasu-anubasu", "pagerank": 10.763662317940701}, {"id": "Lady Gaga", "pagerank": 10.73246406164831}, {"id": "Earth, Wind", "pagerank": 10.693820693468398}, {"id": "Honey Cone", "pagerank": 10.577510964348571}, {"id": "Nina Simone", "pagerank": 10.508464446442769}, {"id": "Charli xcx", "pagerank": 10.477466347750266}, {"id": "Metallica", "pagerank": 10.468601827137476}, {"id": "KISS", "pagerank": 10.42735662351432}, {"id": "Marvin Gaye", "pagerank": 10.328374813614786}, {"id": "wotaku", "pagerank": 10.250261894019857}, {"id": "Funkadelic", "pagerank": 10.210879719409789}, {"id": "50 Cent", "pagerank": 10.198599724931015}, {"id": "George Buzinkai", "pagerank": 10.191585047587193}, {"id": "Parliament", "pagerank": 10.057492503682987}, {"id": "\u30d4\u30ce\u30ad\u30aa\u30d4\u30fc", "pagerank": 10.034423818871094}, {"id": "\u4e00\u4e4b\u702c\u525b", "pagerank": 9.708837114152859}, {"id": "Gotye", "pagerank": 9.510982235124025}, {"id": "Bob James", "pagerank": 9.496247581389087}, {"id": "Bette Midler", "pagerank": 9.459344900827048}, {"id": "Caramell", "pagerank": 9.41611975157749}, {"id": "Iron Maiden", "pagerank": 9.381284677188408}, {"id": "The Flight", "pagerank": 9.36347020974158}, {"id": "Jack Finlay", "pagerank": 9.30900549432069}, {"id": "Wu\u2010Tang Clan", "pagerank": 9.10584384653091}, {"id": "Countess Coloratura", "pagerank": 9.101768873656182}, {"id": "Rebecca Shoichet", "pagerank": 9.080061693167114}, {"id": "JoinedTheHerd", "pagerank": 9.072279873746506}, {"id": "Twilight Sparkle", "pagerank": 9.072279873746506}, {"id": "Brenda", "pagerank": 8.90168271937251}, {"id": "Nas", "pagerank": 8.860874709352602}, {"id": "Falco", "pagerank": 8.74878822912708}, {"id": "Syncopix", "pagerank": 8.637417131945616}, {"id": "Snail\u2019s House", "pagerank": 8.61400879531567}, {"id": "100 gecs", "pagerank": 8.535933611543394}, {"id": "Rockabye Baby!", "pagerank": 8.507937880244624}, {"id": "yUuZa1", "pagerank": 8.503188232748402}, {"id": "Above", "pagerank": 8.496728946588698}, {"id": "Carly Rae Jepsen", "pagerank": 8.474328969413707}, {"id": "Led Zeppelin", "pagerank": 8.44453304073235}, {"id": "Nirvana", "pagerank": 8.370851402459365}, {"id": "m\u2010flo", "pagerank": 8.22152514439055}, {"id": "\u76ee\u9ed2\u5c06\u53f8", "pagerank": 8.134593912718989}, {"id": "The Isley Brothers", "pagerank": 8.121999202728814}, {"id": "Lil Wayne", "pagerank": 8.081833958426094}, {"id": "The Doors", "pagerank": 7.980042807268228}, {"id": "\u5ddd\u6751\u3086\u307f", "pagerank": 7.967303307969174}, {"id": "Extreme", "pagerank": 7.907296865333036}, {"id": "t.A.T.u.", "pagerank": 7.884679650900624}, {"id": "Seth Parker", "pagerank": 7.874024561194391}, {"id": "KIZAN518", "pagerank": 7.8638097233666}, {"id": "Stormwolf", "pagerank": 7.836169977214967}, {"id": "\u4e0b\u6751\u967d\u5b50", "pagerank": 7.806659700396108}, {"id": "Glaze", "pagerank": 7.727265106634842}, {"id": "d.notive", "pagerank": 7.724296614986083}, {"id": "The Queenstons", "pagerank": 7.673478370660063}, {"id": "Barry White", "pagerank": 7.670473740100253}, {"id": "The Supremes", "pagerank": 7.657217545416989}, {"id": "Eurythmics", "pagerank": 7.591328953059251}, {"id": "The Wailers", "pagerank": 7.585444435204378}, {"id": "CYBERTHING!", "pagerank": 7.578752246655752}, {"id": "Skrillex", "pagerank": 7.490673607576977}, {"id": "Herbie Hancock", "pagerank": 7.4742053095464644}, {"id": "Akira Yamaoka", "pagerank": 7.465687701396423}, {"id": "Rihanna", "pagerank": 7.434464886384707}, {"id": "Stevie Wonder", "pagerank": 7.350883055012969}, {"id": "Whitaker Trebella", "pagerank": 7.313733562910523}, {"id": "Chaka Khan", "pagerank": 7.25565702717394}, {"id": "Lena Raine", "pagerank": 7.219068756358002}, {"id": "Diana Ross", "pagerank": 7.212449673785277}, {"id": "Janet Jackson", "pagerank": 7.17322171267893}, {"id": "Serge Gainsbourg", "pagerank": 7.162726463856993}, {"id": "deadmau5", "pagerank": 7.136027347670609}, {"id": "Gorillaz", "pagerank": 7.053303362448501}, {"id": "Dionne Warwick", "pagerank": 7.048430468909729}, {"id": "Zapp", "pagerank": 7.034124259278137}, {"id": "Beck", "pagerank": 7.019818588804103}, {"id": "Donna Summer", "pagerank": 7.017764336130109}, {"id": "\u0418\u0432\u0430\u043d \u041a\u0443\u043f\u0430\u043b\u0430", "pagerank": 6.9156970709441055}, {"id": "System of a Down", "pagerank": 6.881852523709739}, {"id": "Iggy Pop", "pagerank": 6.851447299342984}, {"id": "Change", "pagerank": 6.8346550380915385}, {"id": "Art of Noise", "pagerank": 6.831051667632023}], "links": [{"source": "Beside", "target": "Eric B.", "weight": 1.0}, {"source": "The Honey Drippers", "target": "Dr. Dre", "weight": 1.0}, {"source": "The Honey Drippers", "target": "50 Cent", "weight": 1.0}, {"source": "John Lennon", "target": "Yoko Ono", "weight": 1.0}, {"source": "The Honey Drippers", "target": "Run\u2010D.M.C.", "weight": 1.0}, {"source": "Wu\u2010Tang Clan", "target": "Drake", "weight": 2.0}, {"source": "Change", "target": "Janet Jackson", "weight": 2.0}, {"source": "Zapp", "target": "2Pac", "weight": 9.0}, {"source": "Bob James", "target": "Nas", "weight": 1.0}, {"source": "[unknown]", "target": "Eric B.", "weight": 1.0}, {"source": "The Honey Drippers", "target": "The Notorious B.I.G.", "weight": 3.0}, {"source": "JAY\u2010Z", "target": "Janet Jackson", "weight": 1.0}, {"source": "Kool", "target": "The Notorious B.I.G.", "weight": 1.0}, {"source": "Change", "target": "[unknown]", "weight": 0.5}, {"source": "James Brown", "target": "JAY\u2010Z", "weight": 12.0}, {"source": "Pink Floyd", "target": "Aphex Twin", "weight": 0.5}, {"source": "James Brown", "target": "Public Enemy", "weight": 9.0}, {"source": "The Honey Drippers", "target": "2Pac", "weight": 3.0}, {"source": "Linkin Park", "target": "JAY\u2010Z", "weight": 3.5}, {"source": "Parliament", "target": "Dr. Dre", "weight": 8.0}, {"source": "The Notorious B.I.G.", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "The Honey Drippers", "target": "Nas", "weight": 2.0}, {"source": "\u5916\u795e\u7530\u6587\u82b8\u9ad8\u6821", "target": "\u96fb\u97f3\u90e8", "weight": 1.5}, {"source": "Beside", "target": "Herbie Hancock", "weight": 1.0}, {"source": "Led Zeppelin", "target": "Beastie Boys", "weight": 5.0}, {"source": "Run\u2010D.M.C.", "target": "Nas", "weight": 1.0}, {"source": "Beastie Boys", "target": "Eminem", "weight": 3.0}, {"source": "Michael Jackson", "target": "Daft Punk", "weight": 0.5}, {"source": "The Honey Drippers", "target": "Janet Jackson", "weight": 1.0}, {"source": "\u96fb\u97f3\u90e8", "target": "\u5916\u795e\u7530\u6587\u82b8\u9ad8\u6821", "weight": 2.5}, {"source": "Katy Perry", "target": "[unknown]", "weight": 0.5}, {"source": "The Honey Drippers", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "Marvin Gaye", "target": "JAY\u2010Z", "weight": 11.0}, {"source": "Wu\u2010Tang Clan", "target": "[unknown]", "weight": 1.0}, {"source": "Michael Jackson", "target": "Ye", "weight": 1.0}, {"source": "Funkadelic", "target": "Nas", "weight": 1.0}, {"source": "deadmau5", "target": "[unknown]", "weight": 2.0}, {"source": "James Brown", "target": "Janet Jackson", "weight": 1.0}, {"source": "Herbie Hancock", "target": "Janet Jackson", "weight": 1.0}, {"source": "James Brown", "target": "Eric B.", "weight": 3.0}, {"source": "Madonna", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "Beside", "target": "Beastie Boys", "weight": 2.0}, {"source": "Run\u2010D.M.C.", "target": "Beastie Boys", "weight": 5.0}, {"source": "Beside", "target": "Linkin Park", "weight": 1.0}, {"source": "Linkin Park", "target": "Eminem", "weight": 8.0}, {"source": "The Jacksons", "target": "Madonna", "weight": 1.0}, {"source": "\u958b\u767a\u5ba4Pixel", "target": "GIRakaCHEEZER", "weight": 2.0}, {"source": "Barry White", "target": "Linkin Park", "weight": 1.0}, {"source": "Justice", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "Dr. Dre", "target": "2Pac", "weight": 2.0}, {"source": "Daniel Ingram", "target": "Twilight Sparkle", "weight": 4.0}, {"source": "2Pac", "target": "James Brown", "weight": 0.5}, {"source": "Isaac Hayes", "target": "Public Enemy", "weight": 2.0}, {"source": "Prince", "target": "[unknown]", "weight": 0.5}, {"source": "Fatboy Slim", "target": "[unknown]", "weight": 3.0}, {"source": "Chaka Khan", "target": "Ye", "weight": 1.0}, {"source": "Drake", "target": "Eminem", "weight": 0.5}, {"source": "James Brown", "target": "2Pac", "weight": 4.0}, {"source": "James Brown", "target": "Dr. Dre", "weight": 2.0}, {"source": "The Jacksons", "target": "Beastie Boys", "weight": 1.0}, {"source": "Rihanna", "target": "[unknown]", "weight": 0.5}, {"source": "Isaac Hayes", "target": "2Pac", "weight": 2.0}, {"source": "Nas", "target": "JAY\u2010Z", "weight": 2.0}, {"source": "Run\u2010D.M.C.", "target": "Michael Jackson", "weight": 1.0}, {"source": "Chic", "target": "[unknown]", "weight": 0.5}, {"source": "Isaac Hayes", "target": "JAY\u2010Z", "weight": 3.0}, {"source": "2Pac", "target": "The Notorious B.I.G.", "weight": 0.5}, {"source": "James Brown", "target": "Beastie Boys", "weight": 5.0}, {"source": "Daft Punk", "target": "Charli xcx", "weight": 1.0}, {"source": "Barry White", "target": "Eminem", "weight": 1.0}, {"source": "Britney Spears", "target": "Charli xcx", "weight": 1.0}, {"source": "Daniel Ingram", "target": "JoinedTheHerd", "weight": 1.5}, {"source": "Diana Ross", "target": "Nas", "weight": 1.0}, {"source": "The Supremes", "target": "Diana Ross", "weight": 0.5}, {"source": "Prince", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "Marvin Gaye", "target": "Ye", "weight": 1.0}, {"source": "Eminem", "target": "Britney Spears", "weight": 1.5}, {"source": "The Beatles", "target": "Beastie Boys", "weight": 5.0}, {"source": "Run\u2010D.M.C.", "target": "Public Enemy", "weight": 1.0}, {"source": "Kraftwerk", "target": "Aphex Twin", "weight": 2.0}, {"source": "The Beatles", "target": "Public Enemy", "weight": 1.0}, {"source": "Art of Noise", "target": "The Prodigy", "weight": 3.0}, {"source": "Run\u2010D.M.C.", "target": "Eminem", "weight": 1.0}, {"source": "James Brown", "target": "Nas", "weight": 2.0}, {"source": "Kraftwerk", "target": "[unknown]", "weight": 1.0}, {"source": "Nina Simone", "target": "Lil Wayne", "weight": 1.0}, {"source": "Ye", "target": "Rihanna", "weight": 1.0}, {"source": "The Notorious B.I.G.", "target": "Rihanna", "weight": 1.0}, {"source": "Lady Gaga", "target": "[unknown]", "weight": 0.5}, {"source": "Eric B.", "target": "Eminem", "weight": 1.0}, {"source": "Prince", "target": "2Pac", "weight": 1.0}, {"source": "Public Enemy", "target": "The Prodigy", "weight": 1.0}, {"source": "Eminem", "target": "[unknown]", "weight": 2.0}, {"source": "Dr. Dre", "target": "The Notorious B.I.G.", "weight": 1.0}, {"source": "Iggy Pop", "target": "Nine Inch Nails", "weight": 1.0}, {"source": "Funkadelic", "target": "Public Enemy", "weight": 1.0}, {"source": "50 Cent", "target": "Eminem", "weight": 1.5}, {"source": "The Sugarhill Gang", "target": "50 Cent", "weight": 1.0}, {"source": "The Sugarhill Gang", "target": "The Notorious B.I.G.", "weight": 1.0}, {"source": "KISS", "target": "Nine Inch Nails", "weight": 1.0}, {"source": "Kool", "target": "2Pac", "weight": 1.0}, {"source": "Isaac Hayes", "target": "Wu\u2010Tang Clan", "weight": 1.0}, {"source": "Isaac Hayes", "target": "The Notorious B.I.G.", "weight": 1.0}, {"source": "m\u2010flo", "target": "\u5b87\u591a\u7530\u30d2\u30ab\u30eb", "weight": 1.0}, {"source": "Public Enemy", "target": "The Notorious B.I.G.", "weight": 1.0}, {"source": "Iron Maiden", "target": "Syncopix", "weight": 1.0}, {"source": "Justice", "target": "[unknown]", "weight": 0.5}, {"source": "GIRakaCHEEZER", "target": "\u958b\u767a\u5ba4Pixel", "weight": 0.5}, {"source": "\u5ddd\u6751\u3086\u307f", "target": "\u76ee\u9ed2\u5c06\u53f8", "weight": 2.0}, {"source": "The Jacksons", "target": "[unknown]", "weight": 0.5}, {"source": "Daft Punk", "target": "Ye", "weight": 2.0}, {"source": "Kool", "target": "Madonna", "weight": 3.0}, {"source": "The Beatles", "target": "[unknown]", "weight": 0.5}, {"source": "Prince", "target": "Nine Inch Nails", "weight": 2.0}, {"source": "Curtis Mayfield", "target": "2Pac", "weight": 2.0}, {"source": "Bette Midler", "target": "Eminem", "weight": 1.0}, {"source": "Beastie Boys", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "Beastie Boys", "target": "Beck", "weight": 1.0}, {"source": "Incredible Bongo Band", "target": "Beastie Boys", "weight": 1.0}, {"source": "Curtis Mayfield", "target": "Ye", "weight": 1.0}, {"source": "The Sugarhill Gang", "target": "Beastie Boys", "weight": 2.0}, {"source": "Queen", "target": "Public Enemy", "weight": 1.0}, {"source": "Herbie Hancock", "target": "Beck", "weight": 1.0}, {"source": "Mariah Carey", "target": "Drake", "weight": 1.0}, {"source": "Chic", "target": "Nas", "weight": 1.0}, {"source": "Nirvana", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "Herbie Hancock", "target": "Nas", "weight": 1.0}, {"source": "George Buzinkai", "target": "Toby Fox", "weight": 1.5}, {"source": "Madonna", "target": "Lady Gaga", "weight": 0.5}, {"source": "The Jacksons", "target": "Mariah Carey", "weight": 1.0}, {"source": "Britney Spears", "target": "Madonna", "weight": 1.0}, {"source": "Beastie Boys", "target": "The Prodigy", "weight": 1.0}, {"source": "Diana Ross", "target": "The Notorious B.I.G.", "weight": 2.0}, {"source": "DJ TECHNORCH", "target": "Donna Summer", "weight": 0.5}, {"source": "Queen", "target": "[unknown]", "weight": 1.5}, {"source": "Michael Jackson", "target": "Rihanna", "weight": 2.0}, {"source": "Stormwolf", "target": "Glaze", "weight": 1.0}, {"source": "Pink Floyd", "target": "Beastie Boys", "weight": 4.0}, {"source": "Isaac Hayes", "target": "Beastie Boys", "weight": 1.0}, {"source": "Chic", "target": "m\u2010flo", "weight": 1.0}, {"source": "IOSYS", "target": "DJ TECHNORCH", "weight": 0.5}, {"source": "Isaac Hayes", "target": "Nas", "weight": 2.0}, {"source": "The Prodigy", "target": "t.A.T.u.", "weight": 1.0}, {"source": "Led Zeppelin", "target": "Fatboy Slim", "weight": 1.0}, {"source": "Skrillex", "target": "deadmau5", "weight": 1.5}, {"source": "Depeche Mode", "target": "Madonna", "weight": 0.5}, {"source": "Nina Simone", "target": "Ye", "weight": 3.0}, {"source": "Funkadelic", "target": "2Pac", "weight": 1.0}, {"source": "Kraftwerk", "target": "Depeche Mode", "weight": 0.5}, {"source": "Britney Spears", "target": "Metallica", "weight": 0.5}, {"source": "Funkadelic", "target": "Mariah Carey", "weight": 1.0}, {"source": "Herbie Hancock", "target": "2Pac", "weight": 2.0}, {"source": "2Pac", "target": "Nas", "weight": 1.0}, {"source": "Eurythmics", "target": "Nas", "weight": 1.0}, {"source": "The Doors", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "Iggy Pop", "target": "[unknown]", "weight": 1.0}, {"source": "Nina Simone", "target": "JAY\u2010Z", "weight": 2.0}, {"source": "Dr. Dre", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "\u8fd1\u85e4\u6d69\u6cbb", "target": "Charli xcx", "weight": 3.0}, {"source": "Michael Jackson", "target": "50 Cent", "weight": 1.0}, {"source": "Jim Jones", "target": "JAY\u2010Z", "weight": 0.5}, {"source": "Pink Floyd", "target": "2Pac", "weight": 1.0}, {"source": "Dionne Warwick", "target": "50 Cent", "weight": 1.0}, {"source": "Daft Punk", "target": "m\u2010flo", "weight": 1.0}, {"source": "Kool", "target": "[unknown]", "weight": 1.0}, {"source": "Public Enemy", "target": "Ye", "weight": 2.0}, {"source": "Britney Spears", "target": "Justice", "weight": 1.0}, {"source": "The Isley Brothers", "target": "JAY\u2010Z", "weight": 2.0}, {"source": "Michael Jackson", "target": "[unknown]", "weight": 1.0}, {"source": "Daft Punk", "target": "Janet Jackson", "weight": 1.0}, {"source": "Zapp", "target": "The Notorious B.I.G.", "weight": 1.0}, {"source": "Rockabye Baby!", "target": "Nirvana", "weight": 0.5}, {"source": "\u30d4\u30ce\u30ad\u30aa\u30d4\u30fc", "target": "\u690e\u540d\u3082\u305f", "weight": 0.5}, {"source": "Funkadelic", "target": "Eric B.", "weight": 1.0}, {"source": "Justice", "target": "Earth, Wind", "weight": 0.5}, {"source": "Run\u2010D.M.C.", "target": "[unknown]", "weight": 0.5}, {"source": "Eurythmics", "target": "Britney Spears", "weight": 1.5}, {"source": "Kool", "target": "Beastie Boys", "weight": 3.0}, {"source": "Friendship", "target": "\u8fd1\u85e4\u6d69\u6cbb", "weight": 1.0}, {"source": "James Brown", "target": "The Notorious B.I.G.", "weight": 3.0}, {"source": "Beastie Boys", "target": "Eric B.", "weight": 1.0}, {"source": "Kraftwerk", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "Chic", "target": "Dr. Dre", "weight": 1.0}, {"source": "Justice", "target": "Daft Punk", "weight": 0.5}, {"source": "Jim Jones", "target": "Drake", "weight": 2.0}, {"source": "Chic", "target": "Beastie Boys", "weight": 1.0}, {"source": "Gorillaz", "target": "[unknown]", "weight": 0.5}, {"source": "Daft Punk", "target": "Queen", "weight": 0.5}, {"source": "Run\u2010D.M.C.", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "Public Enemy", "target": "Beastie Boys", "weight": 2.0}, {"source": "Daft Punk", "target": "Drake", "weight": 1.0}, {"source": "Curtis Mayfield", "target": "Beastie Boys", "weight": 2.0}, {"source": "Incredible Bongo Band", "target": "Nas", "weight": 2.0}, {"source": "Kool", "target": "Eric B.", "weight": 2.0}, {"source": "Curtis Mayfield", "target": "The Notorious B.I.G.", "weight": 1.0}, {"source": "Parliament", "target": "2Pac", "weight": 2.0}, {"source": "John Lennon", "target": "The Beatles", "weight": 3.0}, {"source": "Incredible Bongo Band", "target": "JAY\u2010Z", "weight": 2.0}, {"source": "Marvin Gaye", "target": "Drake", "weight": 1.0}, {"source": "\u6238\u8d8a\u307e\u3054\u3081", "target": "\u6298\u6238\u4f38\u6cbb", "weight": 0.5}, {"source": "Incredible Bongo Band", "target": "The Sugarhill Gang", "weight": 1.0}, {"source": "Rebecca Shoichet", "target": "Daniel Ingram", "weight": 0.5}, {"source": "Daniel Ingram", "target": "Countess Coloratura", "weight": 0.5}, {"source": "\u8fd1\u85e4\u6d69\u6cbb", "target": "C418", "weight": 1.0}, {"source": "Yoko Ono", "target": "John Lennon", "weight": 1.0}, {"source": "Public Enemy", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "The Isley Brothers", "target": "2Pac", "weight": 1.0}, {"source": "The Wailers", "target": "50 Cent", "weight": 1.0}, {"source": "Daft Punk", "target": "[unknown]", "weight": 0.5}, {"source": "Incredible Bongo Band", "target": "Aphex Twin", "weight": 1.0}, {"source": "The Notorious B.I.G.", "target": "Skrillex", "weight": 1.0}, {"source": "Fatboy Slim", "target": "Earth, Wind", "weight": 0.5}, {"source": "Gorillaz", "target": "100 gecs", "weight": 0.5}, {"source": "Run\u2010D.M.C.", "target": "100 gecs", "weight": 1.0}, {"source": "Eric B.", "target": "Nas", "weight": 4.0}, {"source": "Bob James", "target": "Eric B.", "weight": 1.0}, {"source": "Madonna", "target": "[unknown]", "weight": 0.5}, {"source": "Curtis Mayfield", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "Prince", "target": "The Notorious B.I.G.", "weight": 1.0}, {"source": "Gorillaz", "target": "Daft Punk", "weight": 0.5}, {"source": "Honey Cone", "target": "Jim Jones", "weight": 3.0}, {"source": "Wu\u2010Tang Clan", "target": "Mariah Carey", "weight": 1.0}, {"source": "Bob James", "target": "Run\u2010D.M.C.", "weight": 1.0}, {"source": "Marvin Gaye", "target": "[unknown]", "weight": 1.5}, {"source": "Porter Robinson", "target": "\u5b87\u591a\u7530\u30d2\u30ab\u30eb", "weight": 0.5}, {"source": "Zapp", "target": "Beastie Boys", "weight": 1.0}, {"source": "Kool", "target": "Nas", "weight": 3.0}, {"source": "The Isley Brothers", "target": "Beastie Boys", "weight": 1.0}, {"source": "Skrillex", "target": "[unknown]", "weight": 0.5}, {"source": "Depeche Mode", "target": "[unknown]", "weight": 0.5}, {"source": "Michael Jackson", "target": "Nas", "weight": 2.0}, {"source": "Eminem", "target": "50 Cent", "weight": 0.5}, {"source": "Barry White", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "Above", "target": "[unknown]", "weight": 0.5}, {"source": "Barry White", "target": "2Pac", "weight": 1.0}, {"source": "Stevie Wonder", "target": "Ye", "weight": 1.0}, {"source": "JAY\u2010Z", "target": "Eminem", "weight": 1.5}, {"source": "Parliament", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "Janet Jackson", "target": "[unknown]", "weight": 0.5}, {"source": "Seth Parker", "target": "Whitaker Trebella", "weight": 0.5}, {"source": "Queen", "target": "Daft Punk", "weight": 1.0}, {"source": "\u690e\u540d\u3082\u305f", "target": "\u30d4\u30ce\u30ad\u30aa\u30d4\u30fc", "weight": 0.5}, {"source": "Michael Jackson", "target": "2Pac", "weight": 1.0}, {"source": "The Prodigy", "target": "Skrillex", "weight": 0.5}, {"source": "Diana Ross", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "Earth, Wind", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "The Winstons", "target": "C418", "weight": 2.0}, {"source": "Zapp", "target": "[unknown]", "weight": 0.5}, {"source": "Nina Simone", "target": "50 Cent", "weight": 1.0}, {"source": "Extreme", "target": "PSY", "weight": 1.0}, {"source": "The Winstons", "target": "The Prodigy", "weight": 1.0}, {"source": "Serge Gainsbourg", "target": "Beck", "weight": 1.0}, {"source": "Twilight Sparkle", "target": "Daniel Ingram", "weight": 0.5}, {"source": "Herbie Hancock", "target": "[unknown]", "weight": 2.0}, {"source": "The Sugarhill Gang", "target": "Chic", "weight": 0.5}, {"source": "Nirvana", "target": "The Prodigy", "weight": 1.0}, {"source": "Drake", "target": "[unknown]", "weight": 0.5}, {"source": "Whitaker Trebella", "target": "Seth Parker", "weight": 0.5}, {"source": "Barry White", "target": "50 Cent", "weight": 3.0}, {"source": "James Brown", "target": "[unknown]", "weight": 0.5}, {"source": "Dr. Dre", "target": "Eminem", "weight": 0.5}, {"source": "Curtis Mayfield", "target": "Eminem", "weight": 1.0}, {"source": "Public Enemy", "target": "Madonna", "weight": 1.0}, {"source": "Stevie Wonder", "target": "2Pac", "weight": 2.0}, {"source": "Porter Robinson", "target": "Mariah Carey", "weight": 1.0}, {"source": "Barry White", "target": "Eric B.", "weight": 1.0}, {"source": "100 gecs", "target": "Charli xcx", "weight": 1.0}, {"source": "JoinedTheHerd", "target": "Daniel Ingram", "weight": 0.5}, {"source": "Lil Wayne", "target": "Eminem", "weight": 0.5}, {"source": "Eric B.", "target": "Prince", "weight": 1.0}, {"source": "Nas", "target": "Eminem", "weight": 1.0}, {"source": "Barry White", "target": "Daft Punk", "weight": 1.0}, {"source": "Barry Manilow", "target": "Daft Punk", "weight": 1.0}, {"source": "Diana Ross", "target": "[unknown]", "weight": 0.5}, {"source": "James Brown", "target": "James Brown", "weight": 0.5}, {"source": "Mariah Carey", "target": "[unknown]", "weight": 0.5}, {"source": "Madonna", "target": "Ye", "weight": 1.0}, {"source": "James Brown", "target": "Daniel Ingram", "weight": 1.0}, {"source": "Herbie Hancock", "target": "Madonna", "weight": 1.0}, {"source": "Earth, Wind", "target": "2Pac", "weight": 1.0}, {"source": "Nina Simone", "target": "[unknown]", "weight": 1.0}, {"source": "Stevie Wonder", "target": "[unknown]", "weight": 1.0}, {"source": "Countess Coloratura", "target": "Daniel Ingram", "weight": 0.5}, {"source": "Syncopix", "target": "Iron Maiden", "weight": 5.0}, {"source": "d.notive", "target": "Stormwolf", "weight": 0.5}, {"source": "Daniel Ingram", "target": "d.notive", "weight": 1.0}, {"source": "The Isley Brothers", "target": "The Notorious B.I.G.", "weight": 1.0}, {"source": "Lyn Collins", "target": "Ye", "weight": 1.0}, {"source": "Lil Wayne", "target": "Drake", "weight": 1.0}, {"source": "\u8fd1\u85e4\u6d69\u6cbb", "target": "[unknown]", "weight": 1.0}, {"source": "The Jacksons", "target": "JAY\u2010Z", "weight": 1.0}, {"source": "The Doors", "target": "50 Cent", "weight": 3.0}, {"source": "\u6298\u6238\u4f38\u6cbb", "target": "\u6238\u8d8a\u307e\u3054\u3081", "weight": 0.5}, {"source": "The Doors", "target": "Skrillex", "weight": 1.0}, {"source": "Lyn Collins", "target": "Snail\u2019s House", "weight": 6.0}, {"source": "Nas", "target": "Drake", "weight": 1.0}, {"source": "Mel Torm\u00e9", "target": "Barry Manilow", "weight": 1.0}, {"source": "The Jacksons", "target": "The Notorious B.I.G.", "weight": 1.0}, {"source": "Bette Midler", "target": "Ye", "weight": 1.0}]};
+
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        const svg = d3.select("#network")
+            .attr("width", width)
+            .attr("height", height);
+
+        // Zoom container
+        const g = svg.append("g");
+
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 8])
+            .on("zoom", (event) => {
+                g.attr("transform", event.transform);
+            });
+        svg.call(zoom);
+
+        // Color scale: warm gradient from purple (low) through pink to orange (high)
+        const prExtent = d3.extent(data.nodes, d => d.pagerank);
+        const colorScale = d3.scaleSequential()
+            .domain(prExtent)
+            .interpolator(t => d3.interpolateRgb("#7f5af0", "#ff8906")(t));
+
+        // Size scale
+        const sizeScale = d3.scaleSqrt()
+            .domain(prExtent)
+            .range([4, 28]);
+
+        // Build adjacency index for click interactions
+        const linkedByIndex = {};
+        data.links.forEach(l => {
+            linkedByIndex[l.source + "," + l.target] = true;
+            linkedByIndex[l.target + "," + l.source] = true;
+        });
+        function isConnected(a, b) {
+            return a === b || linkedByIndex[a.id + "," + b.id];
+        }
+
+        // Arrow marker
+        g.append("defs").append("marker")
+            .attr("id", "arrowhead")
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 20)
+            .attr("refY", 0)
+            .attr("markerWidth", 6)
+            .attr("markerHeight", 6)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M0,-4L10,0L0,4")
+            .attr("fill", "rgba(255,255,255,0.15)");
+
+        const simulation = d3.forceSimulation(data.nodes)
+            .force("link", d3.forceLink(data.links).id(d => d.id).distance(90))
+            .force("charge", d3.forceManyBody().strength(-220))
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("collide", d3.forceCollide().radius(d => sizeScale(d.pagerank) + 6));
+
+        const link = g.append("g")
+            .selectAll("line")
+            .data(data.links)
+            .join("line")
+            .attr("stroke", "rgba(255,255,255,0.07)")
+            .attr("stroke-width", d => Math.max(0.5, Math.sqrt(d.weight) * 0.6))
+            .attr("marker-end", "url(#arrowhead)");
+
+        const node = g.append("g")
+            .selectAll("circle")
+            .data(data.nodes)
+            .join("circle")
+            .attr("r", d => sizeScale(d.pagerank))
+            .attr("fill", d => colorScale(d.pagerank))
+            .attr("stroke", "rgba(255,255,255,0.15)")
+            .attr("stroke-width", 1)
+            .style("cursor", "pointer")
+            .call(drag(simulation));
+
+        // Labels: only show for larger nodes by default
+        const label = g.append("g")
+            .selectAll("text")
+            .data(data.nodes)
+            .join("text")
+            .attr("dy", d => -sizeScale(d.pagerank) - 6)
+            .attr("text-anchor", "middle")
+            .text(d => d.id)
+            .style("fill", "#fffffe")
+            .style("font-size", d => {
+                const s = sizeScale(d.pagerank);
+                return s > 12 ? "11px" : "9px";
+            })
+            .style("font-weight", d => sizeScale(d.pagerank) > 16 ? "600" : "400")
+            .style("paint-order", "stroke")
+            .style("stroke", "#0f0e17")
+            .style("stroke-width", "3px")
+            .style("stroke-linecap", "round")
+            .style("stroke-linejoin", "round")
+            .style("opacity", d => sizeScale(d.pagerank) > 8 ? 1 : 0)
+            .style("pointer-events", "none");
+
+        // Tooltip
+        const tooltip = d3.select("#tooltip");
+
+        node.on("mouseover", (event, d) => {
+            tooltip.transition().duration(120).style("opacity", 1);
+            tooltip.html(`<b>${d.id}</b><br><span class="score">Authority Score: ${d.pagerank.toFixed(6)}</span>`)
+                .style("left", (event.pageX + 14) + "px")
+                .style("top", (event.pageY - 36) + "px");
+        })
+        .on("mousemove", (event) => {
+            tooltip.style("left", (event.pageX + 14) + "px")
+                   .style("top", (event.pageY - 36) + "px");
+        })
+        .on("mouseout", () => {
+            tooltip.transition().duration(300).style("opacity", 0);
+        });
+
+        // Click to highlight neighbors
+        let selectedNode = null;
+
+        node.on("click", (event, d) => {
+            event.stopPropagation();
+            selectedNode = d;
+
+            // Fade everything
+            node.transition().duration(300)
+                .attr("opacity", o => isConnected(d, o) ? 1 : 0.08);
+            link.transition().duration(300)
+                .attr("stroke", l => (l.source === d || l.target === d) ? "rgba(255,137,6,0.5)" : "rgba(255,255,255,0.02)")
+                .attr("stroke-width", l => (l.source === d || l.target === d) ? 2 : 0.3);
+            label.transition().duration(300)
+                .style("opacity", o => isConnected(d, o) ? 1 : 0);
+
+            // Show detail panel
+            const panel = document.getElementById("detail-panel");
+            document.getElementById("detail-name").textContent = d.id;
+            document.getElementById("detail-score").innerHTML = `<span style="color:rgba(255,255,255,0.5)">Authority: ${d.pagerank.toFixed(6)}</span>`;
+
+            // Find connections
+            const conns = data.links.filter(l => l.source.id === d.id || l.target.id === d.id);
+            const connHTML = conns.map(l => {
+                const other = l.source.id === d.id ? l.target.id : l.source.id;
+                const dir = l.source.id === d.id ? "sampled by →" : "← samples";
+                return `<div class="conn-item">${other} <span>${dir} (w:${l.weight})</span></div>`;
+            }).join("");
+            document.getElementById("detail-connections").innerHTML = connHTML || "<div class='conn-item' style='color:rgba(255,255,255,0.3)'>No connections in top 150</div>";
+
+            panel.classList.add("visible");
+        });
+
+        svg.on("click", () => {
+            clearSelection();
+        });
+
+        function clearSelection() {
+            selectedNode = null;
+            node.transition().duration(300).attr("opacity", 1);
+            link.transition().duration(300)
+                .attr("stroke", "rgba(255,255,255,0.07)")
+                .attr("stroke-width", d => Math.max(0.5, Math.sqrt(d.weight) * 0.6));
+            label.transition().duration(300)
+                .style("opacity", d => sizeScale(d.pagerank) > 8 ? 1 : 0);
+            document.getElementById("detail-panel").classList.remove("visible");
+        }
+
+        simulation.on("tick", () => {
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            node
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y);
+
+            label
+                .attr("x", d => d.x)
+                .attr("y", d => d.y);
+        });
+
+        function drag(simulation) {
+            function dragstarted(event) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                event.subject.fx = event.subject.x;
+                event.subject.fy = event.subject.y;
+            }
+            function dragged(event) {
+                event.subject.fx = event.x;
+                event.subject.fy = event.y;
+            }
+            function dragended(event) {
+                if (!event.active) simulation.alphaTarget(0);
+                event.subject.fx = null;
+                event.subject.fy = null;
+            }
+            return d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended);
+        }
+
+        // Initial zoom-to-fit after simulation settles
+        simulation.on("end", () => {
+            const bounds = g.node().getBBox();
+            const fullWidth = bounds.width;
+            const fullHeight = bounds.height;
+            const midX = bounds.x + fullWidth / 2;
+            const midY = bounds.y + fullHeight / 2;
+            const scale = 0.85 / Math.max(fullWidth / width, fullHeight / height);
+            const translate = [width / 2 - scale * midX, height / 2 - scale * midY];
+            svg.transition().duration(750).call(
+                zoom.transform,
+                d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
+            );
+        });
+    </script>
+</body>
+</html>

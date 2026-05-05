@@ -2,6 +2,7 @@
 \usepackage{ifxetex,ifluatex}
 \ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
     \usepackage[utf8]{inputenc}
+    \usepackage{CJKutf8}
     %\usepackage[T1]{fontenc} % to properly render accented characters
     %\usepackage{lmodern} % use with T1 font encoding
 \else % if luatex or xetex
@@ -25,6 +26,7 @@
 \usepackage{array}
 \newcolumntype{Y}{>{\centering\arraybackslash}X}
 \usepackage{tabularx}
+\usepackage{booktabs}
 \renewcommand\tabularxcolumn[1]{m{#1}}% for vertical centering text in X column
 
 \usepackage{graphicx,subcaption,lipsum}
@@ -149,7 +151,7 @@ A critical data quality issue identified during exploratory analysis was the pre
 \noindent\textbf{Impact on Analysis:} Self-loops create two fundamental problems for network mining:
 
 \begin{enumerate}
-    \item \textbf{Authority Inflation}: In PageRank, self-loops create feedback loops where nodes artificially boost their own authority scores. One artist ("Ninja McTits") had 443 self-loops, resulting in a PageRank score of 66.45—dramatically higher than the legitimate top artist (James Brown: 11.70).
+    \item \textbf{Authority Inflation}: In PageRank, self-loops create feedback loops where nodes artificially boost their own authority scores. One artist ("Ninja McTits") had 443 self-loops, resulting in a PageRank score of 66.45—dramatically higher than the legitimate top artist (James Brown: 45.44).
     \item \textbf{Misleading Genealogy}: Self-sampling does not represent cross-artist influence or musical genealogy. It reflects internal artistic recycling rather than the transmission of ideas between different creators.
 \end{enumerate}
 
@@ -242,7 +244,7 @@ A crucial distinction of this methodology is that it operates blindly regarding 
 \section{Results}
 
 \subsection{Network Statistics and Validation}
-The final processed graph, after removing self-loops (artist sampling themselves), comprises \textbf{20,728 sampling events} (edges) connecting \textbf{30,021 songs} (nodes) across \textbf{13,587 unique artists}. The removal of 1,407 self-loops (6.4\% of raw edges) was essential to ensure that the network represents genuine cross-artist influence rather than internal artistic recycling.
+The final processed graph, after extensive data engineering using MusicBrainz GIDs and removing self-loops (artists sampling themselves), comprises \textbf{58,621 sampling events} (edges) connecting \textbf{68,527 songs} (nodes) across \textbf{23,660 unique artists}.
 
 The network exhibits classic \textbf{scale-free} characteristics, as evidenced by the power-law degree distribution shown in Figure~\ref{fig:degree_dist}.
 
@@ -255,39 +257,19 @@ The network exhibits classic \textbf{scale-free} characteristics, as evidenced b
 
 \textbf{Key Network Properties:}
 \begin{itemize}
-    \item \textbf{Graph Density}: 0.00002456 (sparse network, as expected in real-world influence networks)
-    \item \textbf{Mean In-Degree}: 2.57 (average times an artist is sampled)
-    \item \textbf{Mean Out-Degree}: 3.23 (average samples used per artist)
-    \item \textbf{Maximum In-Degree}: 183 (James Brown - most sampled artist)
-    \item \textbf{Power-Law Concentration}: Top 1\% of artists control 21.8\% of all sampling events, Top 10\% control significant majority
+    \item \textbf{Graph Density}: 0.00001248 (sparse network, as expected in real-world influence networks)
+    \item \textbf{Mean In-Degree}: 3.50 (average times an artist is sampled)
+    \item \textbf{Mean Out-Degree}: 6.02 (average samples used per artist)
+    \item \textbf{Maximum In-Degree}: 371 (Daft Punk - most sampled artist)
+    \item \textbf{Power-Law Concentration}: Top 1\% of artists control 23.6\% of all sampling events, Top 10\% control 58.2\%
 \end{itemize}
 
 \noindent This concentration pattern validates the scale-free network hypothesis: musical influence follows preferential attachment, where established authorities accumulate disproportionate influence over time.
 
 \subsection{PageRank Authority Rankings}
-The PageRank algorithm converged in \textbf{11 iterations} (tolerance $< 0.0001$), producing authority scores that reveal the structural importance of artists beyond mere volume. Table~\ref{tab:top10} presents the top 10 artists ranked by PageRank authority.
+The PageRank algorithm converged in \textbf{11 iterations} (tolerance $< 0.0001$), producing authority scores that reveal the structural importance of artists beyond mere volume. Table~\ref{tab:top10comparison} presents the comparison of the top 10 artists by volume versus authority.
 
-\begin{table}[H]
-\centering
-\begin{tabular}{|r|l|r|r|}
-\hline
-\textbf{Rank} & \textbf{Artist} & \textbf{PageRank} & \textbf{In-Degree} \\
-\hline
-1 & James Brown & 11.70 & 183 \\
-2 & Beastie Boys & 9.19 & 67 \\
-3 & Daft Punk & 7.53 & 99 \\
-4 & Jay-Z & 7.06 & 44 \\
-5 & The Notorious B.I.G. & 6.60 & 34 \\
-6 & The Beatles & 6.53 & 77 \\
-7 & The Rolling Stones & 6.15 & 44 \\
-8 & (Koji Kondo) & 6.15 & 49 \\
-9 & [unknown] & 5.87 & 85 \\
-10 & OutKast & 5.80 & 37 \\
-\hline
-\end{tabular}
-\caption{Top 10 artists by PageRank authority score (after self-loop removal). Note how Jay-Z and The Notorious B.I.G. achieve high PageRank despite lower in-degrees, demonstrating structural position matters as much as volume.}
-\label{tab:top10}
-\end{table}
+\input{Immagini/table_top10_comparison.tex}
 
 \subsection{Volume vs. Authority: The Hidden Influencers}
 Comparing the results of Degree Centrality (Volume) against PageRank (Authority) reveals significant insights into the music ecosystem, as shown in Figure~\ref{fig:volume_authority}.
@@ -295,97 +277,84 @@ Comparing the results of Degree Centrality (Volume) against PageRank (Authority)
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{fig2_volume_vs_authority.pdf}
-    \caption{Top 20 artists: Volume (In-Degree) vs. Authority (PageRank). While most artists follow the diagonal (high volume = high authority), outliers like Koji Kondo demonstrate that structural position matters as much as raw popularity.}
+    \caption{Top 20 artists: Volume (In-Degree) vs. Authority (PageRank). The two rankings reveal a critical gap: high volume does not always translate to high structural authority, exposing the role of community density in PageRank scores.}
     \label{fig:volume_authority}
 \end{figure}
 
 \begin{itemize}
-    \item \textbf{The Volume Kings}: As expected, Funk and Soul legends like \textbf{James Brown} dominate both metrics. With 183 sampling events and a PageRank of 11.70, he is unequivocally the "Godfather of Sampling."
-    \item \textbf{The Structural Bridges}: Artists like \textbf{Daft Punk} and \textbf{Beastie Boys} show high PageRank relative to their in-degree. They act as "bridges" between genres, absorbing influence from the past and transmitting it to highly connected modern artists.
-    \item \textbf{The Unexpected Authority - Koji Kondo}: Perhaps the most surprising finding is the appearance of \textbf{Koji Kondo}, the Nintendo video game composer, ranking 8th with PageRank 6.15. With 49 sampling events, this reveals a non-traditional genealogy: 1980s-90s video game music (Super Mario Bros., The Legend of Zelda) has been extensively sampled in modern hip hop, demonstrating cross-genre influence beyond conventional musicology.
+    \item \textbf{The Volume Kings}: Modern electronic and pop icons like \textbf{Daft Punk} (371 events) and \textbf{Lady Gaga} (282) dominate the volume metrics. These are the artists most frequently sampled in absolute terms.
+    \item \textbf{The Classic Authorities}: \textbf{James Brown}, \textbf{Lyn Collins}, and \textbf{Kraftwerk} rank high in PageRank authority despite lower raw volume, indicating that their samplers are themselves highly influential artists --- a hallmark of genuine structural importance.
+    \item \textbf{The Community-Driven Outlier}: \textbf{Daniel Ingram} (composer for \textit{My Little Pony}) achieves the highest PageRank (59.38) despite only 130 sampling events. As explored in Section~4.4.4, this is driven by a dense, insular fan community rather than mainstream influence --- illustrating how PageRank can be amplified by tight cluster structures.
 \end{itemize}
 
 \subsection{Musical Genealogy Networks}
-To visualize the actual "who sampled who" relationships, I created network diagrams showing the structural genealogy of music.
+To visualize the actual ``who sampled who'' relationships, I created network diagrams showing the structural genealogy of music. Each visualization isolates a specific aspect of the network to make the results clear and interpretable.
 
-\subsubsection{Top 15 Artists Sampling Network}
-Figure~\ref{fig:top15network} shows the core sampling relationships among the 15 most influential artists. To avoid visual clutter, only strong connections (weight $\geq$ 3) are displayed, resulting in 9 key relationships that form the backbone of modern sampling culture.
+\subsubsection{Top 15 Most-Sampled Artists Network}
+Figure~\ref{fig:top15network} shows the core sampling relationships among the 15 most-sampled artists by volume (in-degree). To avoid visual clutter, only connections with weight $\geq$ 2 are displayed.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{fig1_top15_sampling_network.pdf}
-    \caption{Top 15 artists sampling network. Arrows point from sampler to original artist (authority). Node size represents PageRank score. This simplified view reveals the core genealogical structure: James Brown as the central hub, with hip hop artists forming the sampling layer.}
+    \caption{Top 15 most-sampled artists and their inter-connections. Arrows point from sampler to original artist. Node size is proportional to sampling volume. This view reveals which top artists also sample each other, forming the backbone of the sampling ecosystem.}
     \label{fig:top15network}
 \end{figure}
 
-\subsubsection{James Brown: The Godfather's Sphere of Influence}
-Figure~\ref{fig:jbego} visualizes James Brown's ego network, showing the 20 major artists who sampled his work most extensively. The perfect circular layout eliminates overlapping and clearly demonstrates why he achieves the highest PageRank score.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.85\textwidth]{fig2_jamesbrown_ego_network.pdf}
-    \caption{James Brown ego network with 20 major samplers arranged in circular layout. This visualization explains his dominant PageRank score (11.70): numerous influential artists (Public Enemy, LL Cool J, Eric B. \& Rakim) sample his funk breaks extensively, creating a massive sphere of influence.}
-    \label{fig:jbego}
-\end{figure}
-
-\subsubsection{Video Game Music in Hip Hop: The Koji Kondo Discovery}
-One of the most surprising findings is the influence of video game composer Koji Kondo on modern hip hop, shown in Figure~\ref{fig:kondo}. This represents a unique cross-genre genealogy rarely studied in traditional musicology.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.85\textwidth]{fig3_kojikondo_ego_network.pdf}
-    \caption{Koji Kondo ego network showing 15 artists who sampled the Nintendo composer's work. Ranking 8th overall with PageRank 6.15 (tied with The Rolling Stones), Kondo's iconic themes from Super Mario Bros. and The Legend of Zelda have entered hip hop's sonic genealogy, demonstrating how 8-bit aesthetics became part of modern music production.}
-    \label{fig:kondo}
-\end{figure}
-
-\noindent \textbf{Analysis}: This finding demonstrates that sampling culture extends beyond traditional music genres. The nostalgic appeal of 1980s-90s video games has influenced a generation of producers who grew up with these sounds, creating a genealogical path: Video Games $\to$ Electronic Music $\to$ Hip Hop.
-
 \subsubsection{Sampling Flow Analysis}
-Figure~\ref{fig:flow} presents a bipartite visualization showing the directional flow of influence from authority sources (right) to modern samplers (left).
+Figure~\ref{fig:flow} presents a bipartite visualization showing the directional flow of influence from authority sources (right) to the heaviest samplers (left).
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.9\textwidth]{fig4_sampling_flow.pdf}
-    \caption{Bipartite sampling flow diagram. Left: top 10 artists who sample heavily (high out-degree). Right: top 10 most-sampled artists (authorities, high in-degree). Line thickness indicates sampling frequency. The clear separation shows modern producers drawing from classic sources, with some artists (e.g., Beastie Boys) appearing on both sides as bridges.}
+    \includegraphics[width=0.9\textwidth]{fig6_sampling_flow.pdf}
+    \caption{Bipartite sampling flow diagram. Left: top 10 artists who sample most heavily (high out-degree). Right: top 10 most-sampled artists (high in-degree). Line thickness indicates sampling frequency. Artists appearing on both sides act as evolutionary bridges.}
     \label{fig:flow}
 \end{figure}
 
-\noindent This visualization reveals a temporal and genre division: the right side represents primarily 1970s-80s funk, soul, and rock sources, while the left side shows 1990s-2000s hip hop and electronic artists. Artists appearing on both sides (like Beastie Boys) act as evolutionary bridges.
-
 \subsection{Artist Classification: Hub Analysis}
-Figure~\ref{fig:hubanalysis} classifies artists based on their sampling behavior, plotting in-degree (times sampled) against out-degree (samples used).
+Figure~\ref{fig:hubanalysis} classifies artists based on their sampling behavior, plotting in-degree (times sampled) against out-degree (samples used). The dashed lines represent median values, dividing the space into four quadrants that reveal distinct artist roles.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.95\textwidth]{fig5_hub_analysis.pdf}
-    \caption{Hub analysis scatter plot. X-axis: out-degree (samples used). Y-axis: in-degree (times sampled). Top 15 artists by PageRank are highlighted in red with labels. Quadrants identify different roles: Authorities (top-left, high in-degree), Bridges (top-right, high both ways), and Heavy Samplers (bottom-right, high out-degree).}
+    \includegraphics[width=0.95\textwidth]{fig7_hub_analysis.pdf}
+    \caption{Hub analysis scatter plot. X-axis: out-degree (samples used). Y-axis: in-degree (times sampled). Top 15 most-sampled artists are highlighted in red. Quadrants identify different roles: Authorities (top-left), Bridges (top-right), and Heavy Samplers (bottom-right).}
     \label{fig:hubanalysis}
 \end{figure}
 
 \textbf{Artist Classifications:}
 \begin{itemize}
-    \item \textbf{Pure Authorities} (top-left quadrant): Artists like James Brown, Marvin Gaye - sampled extensively but use few samples themselves. They are the "source material" of modern music.
-    \item \textbf{Bridges} (top-right quadrant, rare): Artists who both sample heavily AND get sampled. These are evolutionary nodes that transform influence.
+    \item \textbf{Pure Authorities} (top-left quadrant): Artists like James Brown and Daft Punk --- sampled extensively but use few samples themselves. They are the ``source material'' of modern music.
+    \item \textbf{Bridges} (top-right quadrant, rare): Artists who both sample heavily AND get sampled. These are evolutionary nodes that transform influence across genres.
     \item \textbf{Heavy Samplers} (bottom-right quadrant): Modern producers who rely extensively on sampling but haven't yet become authorities themselves.
 \end{itemize}
 
-\noindent The strong correlation between in-degree and PageRank (visible by red dots clustering in the upper-left) validates the PageRank algorithm: authority derives primarily from being sampled by influential artists.
+\subsection{Graph Statistics Summary}
+Figure~\ref{fig:graphstats} provides a comprehensive overview of the network's macroscopic properties.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{fig5_graph_statistics.pdf}
+    \caption{Summary of key graph statistics. The transition to robust GID-based entity resolution resulted in a vastly expanded network connecting over 68,000 songs.}
+    \label{fig:graphstats}
+\end{figure}
+
+\subsubsection{Interactive D3.js Visualization}
+To effectively explore the immense scale of the expanded dataset (over 58,000 edges), I also developed an interactive web-based D3.js visualization that allows users to pan, zoom, and click on nodes to inspect real-time Authority Scores and isolate specific sampling lineages. The interactive visualization is available at: \href{run:../project/outputs/interactive_genealogy.html}{interactive\_genealogy.html}
 
 \subsection{Community Detection and Genealogical Families}
-The Label Propagation Algorithm detected \textbf{7,954 distinct clusters} with a modularity score of \textbf{0.2724}, indicating moderate community structure. This suggests the music network is neither completely fragmented nor fully connected, but exhibits meaningful genealogical families.
+The Label Propagation Algorithm detected \textbf{13,971 distinct clusters} with a modularity score of \textbf{0.1926}, indicating a complex and overlapping community structure. This suggests the music network is highly interconnected across genre boundaries.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{fig4_cluster_distribution.pdf}
-    \caption{Distribution of cluster sizes. The top 5 clusters contain 143, 94, 90, 74, and 66 artists respectively. The long tail indicates most clusters are small genealogical "chains" while a few represent major musical movements.}
+    \caption{Distribution of cluster sizes. The long tail indicates most clusters are small genealogical "chains" while a few represent major musical movements.}
     \label{fig:clusterdist}
 \end{figure}
 
 \textbf{Cluster Analysis:}
 \begin{itemize}
-    \item \textbf{Largest Cluster (143 artists)}: Led by James Brown, represents the dominant genealogical lineage funk/soul $\to$ hip hop
-    \item \textbf{Modularity 0.2724}: Indicates communities are distinguishable but not completely isolated - expected in music where genres blend
-    \item \textbf{7,954 clusters}: Many small clusters represent isolated sampling chains (A $\to$ B $\to$ C) that haven't connected to the main network
+    \item \textbf{Largest Cluster}: Contains 327 artists, representing the dominant, highly integrated core of modern sampling.
+    \item \textbf{Modularity 0.1926}: Indicates communities are distinguishable but heavily overlapping - expected in modern digital music where producers freely mix samples from disparate sources.
+    \item \textbf{13,971 clusters}: The vast number of clusters highlights the fragmented nature of niche internet subcultures and isolated sampling chains that haven't connected to the main network.
 \end{itemize}
 
 \subsection{Power-Law Validation}
@@ -394,11 +363,11 @@ Figure~\ref{fig:powerlaw} validates the scale-free network hypothesis through cu
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{fig7_powerlaw_analysis.pdf}
-    \caption{Power-law validation: cumulative degree distribution (log-log scale). The linear trend in log-log space confirms the network follows a power-law distribution. Concentration analysis shows top 1\% of artists control 18.7\%, top 5\% control 38.7\%, and top 10\% control 50.4\% of all sampling events.}
+    \caption{Power-law validation: cumulative degree distribution (log-log scale). The linear trend in log-log space confirms the network follows a power-law distribution. Concentration analysis shows top 1\% of artists control 23.6\%, top 5\% control 46.6\%, and top 10\% control 58.2\% of all sampling events.}
     \label{fig:powerlaw}
 \end{figure}
 
-\noindent This confirms the "rich get richer" phenomenon: established artists like James Brown accumulate sampling events at a rate proportional to their existing influence (\textbf{preferential attachment}), characteristic of real-world social and influence networks.
+\noindent This confirms the "rich get richer" phenomenon: established artists accumulate sampling events at a rate proportional to their existing influence (\textbf{preferential attachment}), characteristic of real-world social and influence networks.
 
 \clearpage
 
@@ -408,9 +377,9 @@ Figure~\ref{fig:powerlaw} validates the scale-free network hypothesis through cu
 This analysis demonstrates that musical influence is fundamentally a \textbf{network phenomenon} governed by structural properties rather than just popularity metrics. Three key insights emerge:
 
 \begin{enumerate}
-    \item \textbf{Authority vs. Popularity}: PageRank reveals that structural position (being sampled by influential artists) matters as much as raw volume. This explains why Koji Kondo ranks higher than artists with more total samples.
+    \item \textbf{Authority vs. Popularity}: PageRank reveals that structural position (being sampled by influential artists) matters as much as raw volume. This explains why certain internet-native franchises rank higher than legacy artists with more total samples.
     
-    \item \textbf{Cross-Genre Genealogy}: The appearance of video game music in hip hop demonstrates that sampling creates unexpected genealogical paths beyond traditional genre boundaries. Music evolution is not linear but networked.
+    \item \textbf{Cross-Genre Genealogy}: The emergence of media franchises (animation, video games) as top authorities demonstrates that sampling creates unexpected genealogical paths beyond traditional genre boundaries.
     
     \item \textbf{Preferential Attachment}: The power-law distribution confirms that musical influence follows the same mathematical patterns as citation networks, social networks, and the World Wide Web - a few hubs dominate while most nodes remain peripheral.
 \end{enumerate}
@@ -423,7 +392,7 @@ This analysis demonstrates that musical influence is fundamentally a \textbf{net
     
     \item \textbf{Convergence Optimization}: Implementing convergence criteria with adaptive stopping improved algorithm efficiency, achieving convergence in just 11 iterations with tolerance $< 0.0001$.
     
-    \item \textbf{Visualization Strategy}: Creating clean, non-overlapping network visualizations (circular layouts for ego networks, bipartite for flow diagrams) makes complex structures interpretable.
+    \item \textbf{Visualization Strategy}: Creating clean, non-overlapping network visualizations makes complex structures interpretable.
 \end{itemize}
 
 \subsection{Limitations and Future Work}
@@ -444,12 +413,12 @@ This project successfully applied distributed graph mining techniques to uncover
 
 \textbf{Key Findings:}
 \begin{itemize}
-    \item \textbf{James Brown} emerges as the undisputed authority (PageRank 11.70), with 183 sampling events forming a massive sphere of influence
-    \item \textbf{Koji Kondo's} appearance (\#8) demonstrates cross-genre genealogy: video game music $\to$ hip hop
-    \item The network follows \textbf{power-law distribution}: top 1\% of artists control 21.8\% of sampling events
-    \item \textbf{7,954 genealogical families} detected with moderate modularity (0.2724), indicating meaningful but overlapping communities
-    \item \textbf{Self-loop removal} (1,407 edges, 6.4\%) ensured analysis measures only genuine cross-artist influence
-    \item \textbf{Convergence in 11 iterations} validates the optimized PageRank implementation
+    \item \textbf{Daniel Ingram} and Japanese electronic projects like \textbf{Denonbu} emerge as the new unexpected authorities, showcasing the immense structural influence of modern media franchises and internet culture on contemporary sampling.
+    \item \textbf{James Brown} and classic funk icons remain foundational pillars, but now share the top echelon with digital-era creators.
+    \item The network follows a strong \textbf{power-law distribution}: the top 1\% of artists control 23.6\% of all sampling events.
+    \item \textbf{13,971 genealogical families} detected with a modularity of 0.1926, indicating a highly interconnected and overlapping modern music landscape.
+    \item \textbf{Entity Resolution}: Transitioning to MusicBrainz GIDs revealed a vastly larger network (58k+ edges) than previously estimated using brittle string matching.
+    \item \textbf{Convergence in 11 iterations} validates the optimized distributed PageRank implementation with proper sink-mass redistribution.
 \end{itemize}
 
 \noindent This analysis shifts the conversation from "who sold the most records" to "who structurally shaped modern music." By leveraging graph theory and distributed computing, we've mapped the DNA of contemporary sound - revealing that influence flows through networks, not charts.

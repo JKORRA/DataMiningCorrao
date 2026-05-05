@@ -1,20 +1,25 @@
 # Python Dependencies for Music Genealogy Network Analysis
 # Apache Spark and Distributed Computing
-pyspark==3.5.0
+pyspark>=3.5.0
 
 # Data Processing and Analysis
-pandas==2.0.2
-numpy==1.24.3
+pandas>=2.0.2
+numpy>=1.24.3
 
 # Network Analysis
-networkx==3.1
+networkx>=3.1
 
 # Visualization
-matplotlib==3.7.1
-seaborn==0.12.2
+matplotlib>=3.7.1
+seaborn>=0.12.2
+
+# String Matching for Validation
+fuzzywuzzy>=0.18.0
+python-Levenshtein>=0.21.0
 
 # Utilities
-py4j==0.10.9.7
+py4j>=0.10.9.7
 
 # Optional: For enhanced performance
-# pyarrow==12.0.0  # Faster Parquet I/O
+# pyarrow>=12.0.0  # Faster Parquet I/O
+scipy>=1.10.0

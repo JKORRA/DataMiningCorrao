@@ -11,6 +11,10 @@
 
 set -e  # Exit on error
 
+# Configure Spark to use local directory instead of /tmp to prevent 'No space left on device' errors
+mkdir -p spark_tmp
+export SPARK_LOCAL_DIRS="$(pwd)/spark_tmp"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -60,13 +64,13 @@ echo "Starting at: $(date)"
 # =============================================================================
 # STEP 1: DATA PREPARATION
 # =============================================================================
-print_step "STEP 1/8: Data Preparation (Building Graph from MusicBrainz)"
+print_step "STEP 1/10: Data Preparation (Building Graph from MusicBrainz)"
 
 if [ -f "outputs/music_graph.parquet/_SUCCESS" ]; then
     print_warning "outputs/music_graph.parquet already exists. Skipping data preparation."
     print_warning "Delete outputs/music_graph.parquet to rebuild from scratch."
 else
-    python src/data_preparation.py
+    python3 src/data_preparation.py
     if [ $? -eq 0 ]; then
         print_success "Graph built successfully → outputs/music_graph.parquet"
     else
@@ -78,9 +82,9 @@ fi
 # =============================================================================
 # STEP 2: DESCRIPTIVE ANALYSIS
 # =============================================================================
-print_step "STEP 2/8: Descriptive Analysis (Volume-based Rankings)"
+print_step "STEP 2/10: Descriptive Analysis (Volume-based Rankings)"
 
-python src/top_ranking.py
+python3 src/top_ranking.py
 if [ $? -eq 0 ]; then
     print_success "Top rankings calculated"
 else
@@ -91,9 +95,9 @@ fi
 # =============================================================================
 # STEP 3: PAGERANK AUTHORITY
 # =============================================================================
-print_step "STEP 3/8: PageRank Authority Calculation (WITH FIXES)"
+print_step "STEP 3/10: PageRank Authority Calculation (WITH FIXES)"
 
-python src/compute_authority_manual.py
+python3 src/compute_authority_manual.py
 if [ $? -eq 0 ]; then
     print_success "PageRank completed → outputs/artist_pagerank.parquet"
 else
@@ -104,9 +108,9 @@ fi
 # =============================================================================
 # STEP 4: CLUSTERING
 # =============================================================================
-print_step "STEP 4/8: Label Propagation Clustering"
+print_step "STEP 4/10: Label Propagation Clustering"
 
-python src/cluster.py
+python3 src/cluster.py
 if [ $? -eq 0 ]; then
     print_success "Clustering completed → outputs/music_labels.parquet"
 else
@@ -117,9 +121,9 @@ fi
 # =============================================================================
 # STEP 5: VALIDATION METRICS
 # =============================================================================
-print_step "STEP 5/8: Graph Validation Metrics (NEW)"
+print_step "STEP 5/10: Graph Validation Metrics (NEW)"
 
-python src/validation_metrics.py
+python3 src/validation_metrics.py
 if [ $? -eq 0 ]; then
     print_success "Validation metrics calculated → outputs/validation_summary.csv"
 else
@@ -130,9 +134,9 @@ fi
 # =============================================================================
 # STEP 6: CLUSTER QUALITY
 # =============================================================================
-print_step "STEP 6/8: Cluster Quality Analysis (NEW)"
+print_step "STEP 6/10: Cluster Quality Analysis (NEW)"
 
-python src/cluster_quality.py
+python3 src/cluster_quality.py
 if [ $? -eq 0 ]; then
     print_success "Cluster quality evaluated → outputs/cluster_quality_summary.csv"
 else
@@ -143,9 +147,9 @@ fi
 # =============================================================================
 # STEP 7: VISUALIZATION
 # =============================================================================
-print_step "STEP 7/8: Network Visualization (IMPROVED)"
+print_step "STEP 7/10: Network Visualization (IMPROVED)"
 
-python utils/visualize_cluster.py
+python3 utils/visualize_cluster.py
 if [ $? -eq 0 ]; then
     print_success "Visualization generated → music_genealogy_final.png"
 else
@@ -156,13 +160,39 @@ fi
 # =============================================================================
 # STEP 8: REPORT FIGURES
 # =============================================================================
-print_step "STEP 8/8: Generate Report Figures (Publication Quality)"
+print_step "STEP 8/10: Generate Report Figures (Publication Quality)"
 
-python src/generate_report_figures.py
+python3 src/generate_report_figures.py
 if [ $? -eq 0 ]; then
     print_success "Report figures generated → figures/report_figures/"
 else
     print_error "Report figure generation failed!"
+    exit 1
+fi
+
+# =============================================================================
+# STEP 9: EXTERNAL VALIDATION
+# =============================================================================
+print_step "STEP 9/10: External Validation against Ground Truth"
+
+python3 src/external_validation.py
+if [ $? -eq 0 ]; then
+    print_success "Validation generated → outputs/external_validation.csv"
+else
+    print_error "External validation failed!"
+    exit 1
+fi
+
+# =============================================================================
+# STEP 10: INTERACTIVE VISUALIZATION
+# =============================================================================
+print_step "STEP 10/10: Generate Interactive Network (D3.js)"
+
+python3 utils/generate_interactive_network.py
+if [ $? -eq 0 ]; then
+    print_success "Interactive viz generated → outputs/interactive_genealogy.html"
+else
+    print_error "Interactive visualization failed!"
     exit 1
 fi
 
@@ -185,11 +215,12 @@ echo "  • validation_summary.csv - Graph statistics"
 echo "  • cluster_quality_summary.csv - Clustering metrics"
 echo "  • cluster_sizes.csv - Detailed cluster distribution"
 echo "  • cluster_bridges.csv - Inter-cluster connections"
+echo "  • external_validation.csv - Ground truth correlation"
+echo "  • interactive_genealogy.html - D3.js Network Explorer"
 echo ""
 echo "📈 Report Figures (figures/):"
-echo "  report_figures/ - 8 statistical figures (PNG + PDF)"
-echo "  genealogy_networks/ - 5 network visualizations (PNG + PDF)"
-echo "  • Total: 12+ publication-quality figures (300 DPI)"
+echo "  report_figures/ - 10 statistical/network figures (PNG + PDF)"
+echo "  • Publication-quality figures (300 DPI)"
 
 echo ""
 echo "⏱️  Total execution time: $(($duration / 60)) minutes $(($duration % 60)) seconds"
@@ -199,7 +230,7 @@ echo ""
 echo -e "${YELLOW}Next Steps:${NC}"
 echo "  1. Review outputs/validation_summary.csv for graph statistics"
 echo "  2. Check outputs/cluster_quality_summary.csv for modularity score"
-echo "  3. View figures/genealogy_networks/ for network visualizations"
+echo "  3. View figures/report_figures/ for network visualizations"
 echo "  4. Read ../README.md for complete project documentation"
 
 print_success "End!"

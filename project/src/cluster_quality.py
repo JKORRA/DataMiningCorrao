@@ -49,7 +49,8 @@ print(f"  Total Nodes Clustered: {size_stats['total_nodes']:,}")
 print(f"  Smallest Cluster: {size_stats['min_size']} nodes")
 print(f"  Largest Cluster: {size_stats['max_size']:,} nodes")
 print(f"  Average Cluster Size: {size_stats['avg_size']:.2f} nodes")
-print(f"  Std Dev Cluster Size: {size_stats['stddev_size']:.2f}")
+stddev = size_stats['stddev_size'] if size_stats['stddev_size'] is not None else 0.0
+print(f"  Std Dev Cluster Size: {stddev:.2f}")
 
 print("\nCluster Size Distribution:")
 cluster_sizes.select(
@@ -70,23 +71,23 @@ print("Range: [-0.5, 1.0] | Good: >0.3 | Excellent: >0.5")
 total_edges = df_graph.count()
 print(f"\nTotal edges in graph: {total_edges:,}")
 
-# Create a mapping: song_id -> cluster_id
-song_to_cluster = df_labels.select(
-    col("song_id"),
+# Create a mapping: artist_name -> cluster_id
+artist_to_cluster = df_labels.select(
+    col("artist_name"),
     col("cluster_id")
 )
 
 # Join edges with cluster information for both source and target
 edges_with_clusters = df_graph \
-    .join(song_to_cluster.alias("src_cluster"), 
-          df_graph.source_song_id == col("src_cluster.song_id"), 
+    .join(artist_to_cluster.alias("src_cluster"), 
+          df_graph.Sampler_Artist_Name == col("src_cluster.artist_name"), 
           "left") \
-    .join(song_to_cluster.alias("tgt_cluster"), 
-          df_graph.target_song_id == col("tgt_cluster.song_id"), 
+    .join(artist_to_cluster.alias("tgt_cluster"), 
+          df_graph.Original_Artist_Name == col("tgt_cluster.artist_name"), 
           "left") \
     .select(
-        col("source_song_id"),
-        col("target_song_id"),
+        col("Sampler_Artist_Name").alias("source_artist"),
+        col("Original_Artist_Name").alias("target_artist"),
         col("src_cluster.cluster_id").alias("src_cluster_id"),
         col("tgt_cluster.cluster_id").alias("tgt_cluster_id")
     )
@@ -131,31 +132,31 @@ print("\n🔗 CLUSTER COHESION ANALYSIS")
 print("-" * 70)
 print("Measures internal connectivity density within clusters")
 
-# For each cluster, calculate internal edge density
-# (For performance, we'll analyze only the top 20 largest clusters)
+top_clusters = cluster_sizes.limit(5).collect()
 
-top_clusters = cluster_sizes.limit(20).select("cluster_representative").rdd.flatMap(lambda x: x).collect()
+print(f"\nAnalyzing top 5 clusters...")
 
-print(f"\nAnalyzing top 20 clusters...")
+# Pre-calculate internal edges for all clusters using the joined edges DataFrame
+cluster_internal_edges_df = edges_with_clusters \
+    .filter(col("src_cluster_id") == col("tgt_cluster_id")) \
+    .groupBy(col("src_cluster_id").alias("cluster_representative")) \
+    .agg(count("*").alias("internal_edges"))
 
-for i, cluster_rep in enumerate(top_clusters[:5], 1):  # Show details for top 5
-    # Get all songs in this cluster
-    cluster_songs = df_labels.filter(col("cluster_representative") == cluster_rep) \
-        .select("song_id").rdd.flatMap(lambda x: x).collect()
+# Join internal edges to the top clusters and evaluate density
+for i, row in enumerate(top_clusters, 1):
+    cluster_rep = row["cluster_representative"]
+    cluster_size = row["cluster_size"]
     
-    cluster_size = len(cluster_songs)
-    
-    # Count edges within this cluster
-    internal_edges = df_graph.filter(
-        col("source_song_id").isin(cluster_songs) & 
-        col("target_song_id").isin(cluster_songs)
-    ).count()
+    # Extract internal edges for this specific cluster from our pre-calculated DF
+    # We do a fast filter on the aggregated dataframe, which is tiny
+    edges_row = cluster_internal_edges_df.filter(col("cluster_representative") == cluster_rep).collect()
+    internal_edges = edges_row[0]["internal_edges"] if edges_row else 0
     
     # Maximum possible edges in a directed graph: n * (n-1)
     max_possible = cluster_size * (cluster_size - 1)
     density = internal_edges / max_possible if max_possible > 0 else 0
     
-    print(f"\n{i}. Cluster '{cluster_rep}':")
+    print(f"\n{i}. Cluster '{cluster_rep[:60]}...' :" if len(cluster_rep) > 60 else f"\n{i}. Cluster '{cluster_rep}':")
     print(f"   Size: {cluster_size} nodes")
     print(f"   Internal edges: {internal_edges}")
     print(f"   Density: {density:.6f} ({100*density:.4f}%)")
@@ -215,15 +216,15 @@ quality_summary = spark.createDataFrame([
 ], ["metric", "value"])
 
 quality_summary.write.mode("overwrite").csv("outputs/cluster_quality_summary.csv", header=True)
-print("✓ Quality summary saved to: ../outputs/cluster_quality_summary.csv")
+print("✓ Quality summary saved to: outputs/cluster_quality_summary.csv")
 
 # Save top clusters
 cluster_sizes.write.mode("overwrite").csv("outputs/cluster_sizes.csv", header=True)
-print("✓ Cluster sizes saved to: ../outputs/cluster_sizes.csv")
+print("✓ Cluster sizes saved to: outputs/cluster_sizes.csv")
 
 # Save bridge connections
 bridges_named.write.mode("overwrite").csv("outputs/cluster_bridges.csv", header=True)
-print("✓ Cluster bridges saved to: ../outputs/cluster_bridges.csv")
+print("✓ Cluster bridges saved to: outputs/cluster_bridges.csv")
 
 print("\n" + "=" * 70)
 print("CLUSTER QUALITY ANALYSIS COMPLETE")

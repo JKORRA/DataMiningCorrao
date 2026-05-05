@@ -12,20 +12,21 @@
 This project analyzes the **genealogy of music** through sampling relationships, modeling the music ecosystem as a directed graph where nodes represent songs and edges represent sampling events. Using distributed graph algorithms (PageRank, Label Propagation) implemented from scratch in Apache Spark, we identify structural authorities and musical communities beyond traditional popularity metrics.
 
 ### Key Findings
-- **20,728 sampling events** connecting 30,021 songs across 13,587 artists
-- **James Brown** emerges as the structural "Godfather" (PageRank: 11.70, 183 samples)
-- **Koji Kondo** (Nintendo composer) reveals cross-genre influence: video games → hip hop
-- **7,954 musical communities** detected (modularity: 0.2724)
-- **Power-law concentration**: Top 1% of artists control 21.8% of all sampling
+- **58,621 sampling events** connecting 68,527 songs across 23,503 artists
+- **Daniel Ingram** emerges as the top structural authority (PageRank: 59.38, Anime/Musical theater composer)
+- **James Brown** is the #2 authority (PageRank: 45.43, 204 samples) - the classic "Godfather of Soul"
+- **13,971 musical communities** detected (modularity: 0.1926)
+- **Power-law concentration**: Top 1% of artists control 23.6% of all sampling events
+- Full support for **CJK (Chinese/Japanese/Korean) Unicode characters** in artist names and visualizations
 
 ---
 
 ## 📁 Project Structure
 
 ```
-MusicProject/
+DataMiningCorrao/
 ├── README.md                          # This file
-├── dataset/                           # Source code and data processing
+├── project/                           # Source code and data processing
 │   ├── src/                          # Core analysis scripts
 │   │   ├── data_preparation.py       # Data ingestion and graph construction
 │   │   ├── compute_authority_manual.py # PageRank implementation
@@ -42,25 +43,23 @@ MusicProject/
 │   │
 │   ├── run_pipeline.sh               # Complete analysis pipeline
 │   ├── requirements.txt              # Python dependencies
-│   │
 │   ├── mbdump/                       # MusicBrainz database dumps (input)
 │   ├── outputs/                      # Analysis results (generated)
 │   │   ├── music_graph.parquet       # Processed graph structure
 │   │   ├── artist_pagerank.parquet   # PageRank results
 │   │   ├── music_clusters.csv        # Cluster assignments
-│   │   ├── cluster_quality_summary.csv
-│   │   ├── validation_summary.csv
-│   │   └── top_100_artists_pagerank.csv
+│   │   ├── music_labels.parquet      # Label propagation results
+│   │   ├── interactive_genealogy.html # D3.js interactive visualization
+│   │   └── cluster_quality_summary.csv
 │   │
 │   └── figures/                      # Generated visualizations
-│       ├── report_figures/           # Statistical plots (8 figures)
-│       └── genealogy_networks/       # Network diagrams (5 figures)
+│       └── report_figures/           # Statistical plots and network diagrams
 │
 └── report/                           # Final report and documentation
     ├── DataMining.pdf                # Final compiled report (MAIN DELIVERABLE)
     ├── DataMining.tex                # LaTeX source
     ├── SPIEGAZIONE_ITALIANA.md       # Italian explanation
-    └── Immagini/                     # Report figures (12 images)
+    └── Immagini/                     # Report figures
 ```
 
 ---
@@ -75,14 +74,14 @@ MusicProject/
 
 ### Installation
 
-1. **Navigate to dataset directory**:
+1. **Navigate to project directory**:
    ```bash
-   cd dataset/
+   cd project/
    ```
 
 2. **Activate virtual environment** (already configured):
    ```bash
-   source venv/bin/activate
+   source ../.venv/bin/activate
    ```
 
 3. **Verify dependencies** (already installed):
@@ -129,41 +128,56 @@ python3 src/genealogy_visualizations.py
 ```
 
 ### Expected Runtime
-- Data preparation: ~2-3 minutes
-- PageRank (11 iterations): ~3-4 minutes
-- Clustering: ~2 minutes
-- Figure generation: ~1 minute
-- **Total pipeline**: ~8-10 minutes
+- Data preparation: ~3-5 minutes
+- PageRank (convergence): ~4-5 minutes
+- Clustering: ~2-3 minutes
+- Figure generation: ~1-2 minutes
+- **Total pipeline**: ~10-15 minutes
 
 ---
 
 ## 📊 Output Files
 
-### Analysis Results (`dataset/outputs/`)
-- `music_graph.parquet/` - Cleaned graph (20,728 edges, no self-loops)
+### Analysis Results (`project/outputs/`)
+- `music_graph.parquet/` - Cleaned graph (58,621 edges, no self-loops)
 - `artist_pagerank.parquet/` - PageRank scores for all artists
-- `music_clusters.csv/` - Song-to-cluster assignments (7,954 clusters)
-- `validation_summary.csv/` - Network statistics
-- `cluster_quality_summary.csv/` - Modularity, sizes, bridge analysis
+- `music_clusters.csv/` - Song-to-cluster assignments
+- `music_labels.parquet/` - Label propagation results (13,971 clusters)
+- `interactive_genealogy.html` - **D3.js interactive visualization** (see below)
 
-### Visualizations (`dataset/figures/`)
+### Visualizations (`project/figures/report_figures/`)
 
-**Statistical Figures** (8 files):
-1. `fig1_degree_distribution.png` - Power-law degree distribution
-2. `fig2_volume_vs_authority.png` - Top 20 comparison (in-degree vs PageRank)
-3. `fig4_cluster_distribution.png` - Cluster size histogram
-4. `fig5_graph_statistics.png` - Network metrics summary
-5. `fig6_top_artists_comparison.png` - Top 10 detailed table
-6. `fig7_powerlaw_analysis.png` - Cumulative distribution
-7. `fig8_methodology_flowchart.png` - Project workflow
-8. `statistics_summary.txt` - Text statistics
+**Figures**:
+1. `fig1_degree_distribution.png/pdf` - Power-law degree distribution
+2. `fig2_volume_vs_authority.png/pdf` - Top 20 comparison (in-degree vs PageRank)
+3. `fig4_cluster_distribution.png/pdf` - Cluster size histogram & top 20
+4. `fig5_graph_statistics.png/pdf` - Network metrics summary table
+5. `fig6_top_artists_comparison.png/pdf` - Top 10 detailed comparison
+6. `fig7_powerlaw_analysis.png/pdf` - Cumulative distribution (log-log)
+7. `fig8_methodology_flowchart.png/pdf` - Project workflow diagram
+8. `fig1_top15_sampling_network.png/pdf` - Top 15 artists inter-connection network
+9. `fig6_sampling_flow.png/pdf` - Bipartite sampling flow (samplers → sampled)
+10. `fig7_hub_analysis.png/pdf` - Hub classification (in-degree vs out-degree)
 
-**Network Diagrams** (5 files):
-1. `fig1_top15_sampling_network.png` - Core sampling relationships
-2. `fig2_jamesbrown_ego_network.png` - James Brown's influence sphere
-3. `fig3_kojikondo_ego_network.png` - Video game music influence
-4. `fig4_sampling_flow.png` - Bipartite flow visualization
-5. `fig5_hub_analysis.png` - In-degree vs out-degree classification
+**Auxiliary Files**:
+- `table_top10_comparison.tex` - LaTeX table for report
+- `statistics_summary.txt` - Text statistics summary
+
+---
+
+## 🎨 Interactive Visualization
+
+An interactive D3.js visualization has been generated to explore the music sampling network:
+
+**File**: `project/outputs/interactive_genealogy.html`
+
+**Features**:
+- Pan and zoom the entire network
+- Click on nodes to view artist details and authority scores
+- Filter and isolate specific sampling lineages
+- Interactive legend for node sizing by in-degree
+
+**To view**: Open the file in any modern web browser.
 
 ---
 
@@ -172,7 +186,8 @@ python3 src/genealogy_visualizations.py
 ### 1. Data Engineering
 - **Source**: MusicBrainz PostgreSQL dumps (500K+ relationships)
 - **Filtering**: Isolated pure "sampling" relationships (IDs: 69, 231)
-- **Critical improvement**: Removed 1,407 self-loops (6.4% of edges) to prevent authority inflation
+- **Self-loop removal**: Filtered out `Sampler_Artist_Name == Original_Artist_Name`
+- **Unicode support**: Full CJK (Chinese/Japanese/Korean) character rendering in both Python plots and LaTeX tables
 - **Storage**: Optimized Parquet format with columnar compression
 
 ### 2. Distributed Graph Algorithms (From Scratch)
@@ -181,18 +196,15 @@ python3 src/genealogy_visualizations.py
 - Iterative MapReduce with convergence criterion (tolerance: 0.0001)
 - Dangling node handling via right outer join
 - Lineage truncation with checkpointing (prevents StackOverflowError)
-- Converged in 11 iterations
+- Converged in ~11 iterations
 
-**Label Propagation Algorithm**:
-- 6 iterations to convergence
+**Label Propagation Algorithm (LPA)**:
 - Unsupervised community detection (no genre metadata)
-- Discovered 7,954 musical families
+- Detected 13,971 distinct clusters
+- Identifies musical "genealogical families"
 
-### 3. Self-Loop Removal Rationale
-Self-loops (artist sampling themselves) were identified as a critical data quality issue:
-- **Problem**: Creates artificial authority inflation (e.g., "Ninja McTits": 443 self-loops → PageRank 66.45)
-- **Solution**: Filter `Sampler_Artist_Name != Original_Artist_Name`
-- **Impact**: Ensures only cross-artist influence is measured
+### 3. Top 15 Network Clarity
+The `fig1_top15_sampling_network` visualization has been refined to show only **inter-connections** between the top 15 most-sampled artists, removing external clutter nodes for maximum clarity.
 
 ---
 
@@ -202,48 +214,48 @@ Self-loops (artist sampling themselves) were identified as a critical data quali
 - **File**: `report/DataMining.pdf`
 - **Language**: English
 - **Contents**: Complete methodology, algorithms, results, discussion
-- **Figures**: 12 publication-quality visualizations (300 DPI)
+- **Figures**: 10 publication-quality visualizations (300 DPI)
 
 ### Italian Explanation
 - **File**: `report/SPIEGAZIONE_ITALIANA.md`
 - **Purpose**: Detailed Italian commentary on findings
-- **Sections**: Network statistics, authority rankings, genealogy analysis
 
 ---
 
 ## 🎯 Key Results Summary
 
 ### Authority Rankings (PageRank)
-1. **James Brown** - 11.70 (The Godfather)
-2. **Beastie Boys** - 9.19
-3. **Daft Punk** - 7.53
-4. **Jay-Z** - 7.06
-5. **The Notorious B.I.G.** - 6.60
+1. **Daniel Ingram** - 59.38 (Musical theater / Anime composer)
+2. **James Brown** - 45.43 (The Godfather of Soul)
+3. **2Pac** - 44.81
+4. **電音部 (Den-On-Bu)** - 38.52 (Japanese multimedia project)
+5. **外神田文芸高校** - 33.77 (Japanese creative group)
 
 ### Network Properties
-- **Nodes**: 30,021 songs (13,587 unique artists)
-- **Edges**: 20,728 sampling events (after self-loop removal)
+- **Nodes**: 68,527 songs (23,503 unique artists)
+- **Edges**: 58,621 sampling events
 - **Graph Type**: Directed, scale-free
-- **Density**: 0.00002456 (sparse)
-- **Mean In-Degree**: 2.57
-- **Mean Out-Degree**: 3.23
+- **Density**: 0.00001248 (sparse)
+- **Mean In-Degree**: 3.52
+- **Mean Out-Degree**: 6.04
 
 ### Community Detection
-- **Total Clusters**: 7,954
-- **Modularity**: 0.2724
-- **Largest Cluster**: 143 songs
-- **Mean Cluster Size**: 2.49
+- **Total Clusters**: 13,971
+- **Modularity**: 0.1926
+- **Largest Cluster**: 675 songs
+- **Mean Cluster Size**: 1.69
 
 ---
 
 ## 🛠️ Technical Stack
 
 - **Apache Spark 3.5.0** (PySpark) - Distributed graph processing
-- **NetworkX 3.1** - Network visualization
-- **Matplotlib 3.7.1** - Statistical plotting
-- **Pandas 2.0.2** - Data manipulation
-- **Python 3.11**
+- **NetworkX 3.x** - Network visualization
+- **Matplotlib 3.x** - Statistical plotting
+- **Pandas 2.x** - Data manipulation
+- **Python 3.11+**
 - **LaTeX (pdflatex)** - Report compilation
+- **D3.js** - Interactive web visualization
 
 ---
 
@@ -253,7 +265,7 @@ Self-loops (artist sampling themselves) were identified as a critical data quali
 
 2. **Checkpointing**: Spark checkpoints are stored in `checkpoints/` and `checkpoints_clustering/` to truncate execution lineage.
 
-3. **Virtual Environment**: A pre-configured `venv/` is included with all dependencies installed.
+3. **Virtual Environment**: A pre-configured `.venv/` is included with all dependencies installed.
 
 4. **Memory Requirements**: Recommended 8GB+ RAM for Spark driver/executors.
 
@@ -277,4 +289,4 @@ Self-loops (artist sampling themselves) were identified as a critical data quali
 
 ---
 
-**Last Updated**: 12 February 2026
+**Last Updated**: 5 May 2026
