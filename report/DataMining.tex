@@ -88,7 +88,7 @@ The objective of this project is to shift the analysis from volume to structure.
 \subsection{Dataset Source}
 \textbf{MusicBrainz} Data was sourced from the \textbf{MusicBrainz} Database, an open music encyclopedia that collects user-contributed metadata. Unlike simplified datasets found on platforms like Kaggle, \textbf{MusicBrainz} provides raw PostgreSQL database dumps. The complexity of this dataset lies in its highly normalized structure (Third Normal Form), which requires significant data engineering to reconstruct meaningful relationships. We utilized the core tables: \colorbox{gray!50}{\texttt{recording}} (songs), \colorbox{gray!50}{\texttt{artist\_credit}} (artist names), \colorbox{gray!50}{\texttt{l\_recording\_recording}} (relationships), and the bridging table \colorbox{gray!50}{\texttt{link}}, which connects specific relationships to their semantic definitions found in the \colorbox{gray!50}{\texttt{link\_type}} table.
 
-\subsection{Data Aquisition and engineering}
+\subsection{Data Acquisition and engineering}
 The raw data consisted of tab-separated value (TSV) files without headers, extracted from the \texttt{mbdump.tar.bz2} archive. The transformation process from raw relational tables to a structured property graph involved three key phases: Schema Definition, Projection, and Graph Reconstruction.
 
 \subsection{Computational Framework Selection}
@@ -166,7 +166,7 @@ A critical data quality issue identified during exploratory analysis was the pre
     \caption{Code Snippet: Self-Loop Removal}
 \end{listing}
 
-This filtering reduced the edge count from 22,135 to 20,728 edges, ensuring that the subsequent PageRank and clustering algorithms measure only \textit{external influence}—the core objective of this genealogical analysis.
+This filtering reduced the edge count from 22,135 to 20,728 edges at the artist level (after collapsing multiple song-level edges between the same artist pair). The final graph at the song level contains 58,621 sampling events—each representing a specific recording-to-recording relationship—which are then aggregated into weighted artist-level edges for the PageRank and clustering analyses. This distinction is important: the 58,621 figure reflects fine-grained song-level interactions, while the 20,728 figure represents the collapsed artist-to-artist topology used for structural analysis. Both levels of granularity are preserved in the processed dataset.
 
 \subsection{Graph Reconstruction}
 The MusicBrainz database is highly normalized. A "Sampling" relationship is stored as a numeric link between two recording IDs (\texttt{entity0} and \texttt{entity1}), without any text information about the song title or artist name. To build a human-readable graph (e.g., Artist A samples Artist B), I implemented a de-normalization pipeline involving a chain of joins across four DataFrames:
@@ -244,14 +244,14 @@ A crucial distinction of this methodology is that it operates blindly regarding 
 \section{Results}
 
 \subsection{Network Statistics and Validation}
-The final processed graph, after extensive data engineering using MusicBrainz GIDs and removing self-loops (artists sampling themselves), comprises \textbf{58,621 sampling events} (edges) connecting \textbf{68,527 songs} (nodes) across \textbf{23,660 unique artists}.
+The final processed graph, after extensive data engineering using MusicBrainz GIDs and removing self-loops (artists sampling themselves), comprises \textbf{58,621 sampling events} (edges) connecting \textbf{68,527 songs} (nodes) across \textbf{23,503 unique artists}.
 
 The network exhibits classic \textbf{scale-free} characteristics, as evidenced by the power-law degree distribution shown in Figure~\ref{fig:degree_dist}.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.85\textwidth]{fig1_degree_distribution.pdf}
-    \caption{Degree distribution following a power-law pattern. Both in-degree (times sampled) and out-degree (samples used) show heavy-tailed distributions, indicating that a small number of artists dominate the sampling landscape while most artists have minimal connectivity.}
+    \includegraphics[width=0.9\textwidth]{fig7_powerlaw_analysis.pdf}
+    \caption{Power-law validation: cumulative degree distribution (log-log scale). The approximately linear trend in log-log space is consistent with a power-law distribution, a hallmark of scale-free networks. Concentration analysis shows top 1\% of artists control 23.6\%, top 5\% control 46.6\%, and top 10\% control 58.2\% of all sampling events.}
     \label{fig:degree_dist}
 \end{figure}
 
@@ -284,7 +284,7 @@ Comparing the results of Degree Centrality (Volume) against PageRank (Authority)
 \begin{itemize}
     \item \textbf{The Volume Kings}: Modern electronic and pop icons like \textbf{Daft Punk} (371 events) and \textbf{Lady Gaga} (282) dominate the volume metrics. These are the artists most frequently sampled in absolute terms.
     \item \textbf{The Classic Authorities}: \textbf{James Brown}, \textbf{Lyn Collins}, and \textbf{Kraftwerk} rank high in PageRank authority despite lower raw volume, indicating that their samplers are themselves highly influential artists --- a hallmark of genuine structural importance.
-    \item \textbf{The Community-Driven Outlier}: \textbf{Daniel Ingram} (composer for \textit{My Little Pony}) achieves the highest PageRank (59.38) despite only 130 sampling events. As explored in Section~4.4.4, this is driven by a dense, insular fan community rather than mainstream influence --- illustrating how PageRank can be amplified by tight cluster structures.
+    \item \textbf{The Community-Driven Outlier}: \textbf{Daniel Ingram} (composer for \textit{My Little Pony}) achieves the highest PageRank (59.38) despite only 130 sampling events. As explored later in the Authority Context analysis, this is driven by a dense, insular fan community rather than mainstream influence --- illustrating how PageRank can be amplified by tight cluster structures.
 \end{itemize}
 
 \subsection{Musical Genealogy Networks}
@@ -300,15 +300,7 @@ Figure~\ref{fig:top15network} shows the core sampling relationships among the 15
     \label{fig:top15network}
 \end{figure}
 
-\subsubsection{Sampling Flow Analysis}
-Figure~\ref{fig:flow} presents a bipartite visualization showing the directional flow of influence from authority sources (right) to the heaviest samplers (left).
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.9\textwidth]{fig6_sampling_flow.pdf}
-    \caption{Bipartite sampling flow diagram. Left: top 10 artists who sample most heavily (high out-degree). Right: top 10 most-sampled artists (high in-degree). Line thickness indicates sampling frequency. Artists appearing on both sides act as evolutionary bridges.}
-    \label{fig:flow}
-\end{figure}
 
 \subsection{Artist Classification: Hub Analysis}
 Figure~\ref{fig:hubanalysis} classifies artists based on their sampling behavior, plotting in-degree (times sampled) against out-degree (samples used). The dashed lines represent median values, dividing the space into four quadrants that reveal distinct artist roles.
@@ -316,32 +308,80 @@ Figure~\ref{fig:hubanalysis} classifies artists based on their sampling behavior
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{fig7_hub_analysis.pdf}
-    \caption{Hub analysis scatter plot. X-axis: out-degree (samples used). Y-axis: in-degree (times sampled). Top 15 most-sampled artists are highlighted in red. Quadrants identify different roles: Authorities (top-left), Bridges (top-right), and Heavy Samplers (bottom-right).}
+    \caption{Hub analysis scatter plot. X-axis: out-degree (samples used). Y-axis: in-degree (times sampled). Top 15 most-sampled artists are highlighted in red. Four quadrants are delineated by median lines: Authorities (top-left), Bridges (top-right), Heavy Samplers (bottom-right), and Peripheral Artists (bottom-left).}
     \label{fig:hubanalysis}
 \end{figure}
 
 \textbf{Artist Classifications:}
 \begin{itemize}
     \item \textbf{Pure Authorities} (top-left quadrant): Artists like James Brown and Daft Punk --- sampled extensively but use few samples themselves. They are the ``source material'' of modern music.
-    \item \textbf{Bridges} (top-right quadrant, rare): Artists who both sample heavily AND get sampled. These are evolutionary nodes that transform influence across genres.
+    \item \textbf{Bridges} (top-right quadrant): Artists who both sample heavily AND get sampled. As discovered in our bridge analysis (Figure~\ref{fig:topbridges}), evolutionary nodes like \textbf{JAY-Z}, \textbf{Beastie Boys}, and \textbf{Ye (Kanye West)} maintain a near-perfect balance, acting as the crucial connective tissue of modern music.
     \item \textbf{Heavy Samplers} (bottom-right quadrant): Modern producers who rely extensively on sampling but haven't yet become authorities themselves.
+    \item \textbf{Peripheral Artists} (bottom-left quadrant): Artists with below-median in-degree and out-degree. These represent the majority of nodes in the long tail of the distribution --- niche creators or artists with few documented sampling relationships in the dataset.
 \end{itemize}
-
-\subsection{Graph Statistics Summary}
-Figure~\ref{fig:graphstats} provides a comprehensive overview of the network's macroscopic properties.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.95\textwidth]{fig5_graph_statistics.pdf}
-    \caption{Summary of key graph statistics. The transition to robust GID-based entity resolution resulted in a vastly expanded network connecting over 68,000 songs.}
-    \label{fig:graphstats}
+    \includegraphics[width=0.95\textwidth]{fig9_top_bridges.pdf}
+    \caption{Top 15 Evolutionary Bridges. These artists maintain the highest geometric mean of in-degree and out-degree, representing key evolutionary nodes in the musical network.}
+    \label{fig:topbridges}
 \end{figure}
+
+\subsection{External Validation Against Ground Truth}
+To assess the robustness of our PageRank authority rankings, we performed external validation using a curated list of the 10 most-sampled artists from \textbf{WhoSampled}, an independent sampling reference. We computed the Spearman rank correlation between the WhoSampled ground-truth ordering and our PageRank rankings, considering only the same 10-artist subset.
+
+The resulting Spearman correlation coefficient is $\rho = 0.37$, indicating a \textbf{moderate positive correlation}. While not perfect, this is notable given fundamental methodological differences: WhoSampled ranks by raw sampling count, whereas PageRank measures structural influence. The moderate agreement confirms that our authority metric captures genuine influence while diverging in meaningful ways---for example, PageRank elevates structurally influential artists like Lyn Collins (ground-truth rank 5, system rank 2) and Kraftwerk (ground-truth rank 6, system rank 3) above high-volume but less structurally central artists like Madonna (ground-truth rank 10, system rank 9) and Public Enemy (ground-truth rank 2, system rank 10).
+
+Full match results are saved in \texttt{outputs/external\_validation.csv}. This validation provides independent confirmation that our PageRank implementation identifies genuinely influential artists while offering a dimension of authority distinct from raw count-based metrics.
+
+\subsection{Authority Context: Internal vs External Influence}
+While PageRank effectively models authority, it does not distinguish between \textit{global} mainstream influence and \textit{insular} community dominance. To investigate the "Daniel Ingram anomaly" (an artist with moderate volume but the highest PageRank), we analyzed the composition of incoming samples for the top 15 authorities.
+
+Figure~\ref{fig:authoritycontext} proves the "Insular Community Hypothesis". While mainstream authorities like James Brown receive the vast majority of their influence from outside their immediate community, Daniel Ingram's authority is driven by a dense, internal network of dedicated remixers.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\textwidth]{fig10_authority_composition.pdf}
+    \caption{Authority Context: Internal vs External Influence. This chart reveals whether an artist's authority is driven by a massive, isolated sub-culture (Internal) or by universal mainstream adoption across genres (External).}
+    \label{fig:authoritycontext}
+\end{figure}
+
+\subsection{Graph Statistics Summary}
+Table~\ref{tab:graphstats} provides a comprehensive overview of the network's macroscopic properties.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{lr}
+    \toprule
+    \textbf{Metric} & \textbf{Value} \\
+    \midrule
+    \textbf{Graph Structure} & \\
+    Total Sampling Events (Edges) & 58,621 \\
+    Unique Songs (Nodes) & 68,527 \\
+    Unique Artists & 23,503 \\
+    -- Artists Who Sample & 9,709 \\
+    -- Artists Being Sampled & 16,634 \\
+    \midrule
+    \textbf{In-Degree Statistics} & \\
+    Mean & 3.50 \\
+    Std Dev & 10.56 \\
+    Maximum & 371 \\
+    \midrule
+    \textbf{Out-Degree Statistics} & \\
+    Mean & 6.02 \\
+    Std Dev & 33.20 \\
+    Maximum & 1,488 \\
+    \bottomrule
+    \end{tabular}
+    \caption{Summary of key graph statistics. The transition to robust GID-based entity resolution resulted in a vastly expanded network connecting over 68,000 songs.}
+    \label{tab:graphstats}
+\end{table}
 
 \subsubsection{Interactive D3.js Visualization}
 To effectively explore the immense scale of the expanded dataset (over 58,000 edges), I also developed an interactive web-based D3.js visualization that allows users to pan, zoom, and click on nodes to inspect real-time Authority Scores and isolate specific sampling lineages. The interactive visualization is available at: \href{run:../project/outputs/interactive_genealogy.html}{interactive\_genealogy.html}
 
 \subsection{Community Detection and Genealogical Families}
-The Label Propagation Algorithm detected \textbf{13,971 distinct clusters} with a modularity score of \textbf{0.1926}, indicating a complex and overlapping community structure. This suggests the music network is highly interconnected across genre boundaries.
+The Label Propagation Algorithm detected \textbf{13,855 distinct clusters} with an intra-cluster edge fraction (simplified modularity) of \textbf{0.1926}, indicating a complex and overlapping community structure. This metric represents the proportion of edges that fall within the same cluster; a value of 0.19 means that approximately 19\% of sampling connections occur between artists in the same genealogical community, while 81\% cross community boundaries. This suggests the music network is highly interconnected across genre boundaries.
 
 \begin{figure}[H]
     \centering
@@ -352,22 +392,24 @@ The Label Propagation Algorithm detected \textbf{13,971 distinct clusters} with 
 
 \textbf{Cluster Analysis:}
 \begin{itemize}
-    \item \textbf{Largest Cluster}: Contains 327 artists, representing the dominant, highly integrated core of modern sampling.
-    \item \textbf{Modularity 0.1926}: Indicates communities are distinguishable but heavily overlapping - expected in modern digital music where producers freely mix samples from disparate sources.
-    \item \textbf{13,971 clusters}: The vast number of clusters highlights the fragmented nature of niche internet subcultures and isolated sampling chains that haven't connected to the main network.
+    \item \textbf{Largest Cluster}: Contains 675 songs, representing the dominant, highly integrated core of modern sampling.
+    \item \textbf{Simplified Modularity 0.1926}: 19\% of edges are intra-cluster, indicating a low but detectable community structure. This is expected in modern digital music where producers freely mix samples from disparate sources.
+    \item \textbf{13,855 clusters}: The vast number of clusters highlights the fragmented nature of niche internet subcultures and isolated sampling chains that haven't connected to the main network.
 \end{itemize}
 
-\subsection{Power-Law Validation}
-Figure~\ref{fig:powerlaw} validates the scale-free network hypothesis through cumulative degree distribution analysis.
+\subsubsection{Macro-Flow: Inter-Community Genealogy}
+While the Label Propagation Algorithm identified isolated communities, music evolution occurs when these communities interact. By aggregating edges at the cluster level, we mapped the macroscopic flow of influence.
+
+As shown in Figure~\ref{fig:macroflow}, distinct musical pipelines emerge. Instead of analyzing individual artists, we can observe how entire ecosystems feed into others, providing a higher-level view of genre cross-pollination.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.9\textwidth]{fig7_powerlaw_analysis.pdf}
-    \caption{Power-law validation: cumulative degree distribution (log-log scale). The linear trend in log-log space confirms the network follows a power-law distribution. Concentration analysis shows top 1\% of artists control 23.6\%, top 5\% control 46.6\%, and top 10\% control 58.2\% of all sampling events.}
-    \label{fig:powerlaw}
+    \includegraphics[width=1\textwidth]{fig11_macro_community_flow.pdf}
+    \caption{Macroscopic Sampling Flow Between Communities. Node size represents total incoming cluster influence, and edge thickness represents the volume of sampling between distinct communities.}
+    \label{fig:macroflow}
 \end{figure}
 
-\noindent This confirms the "rich get richer" phenomenon: established artists accumulate sampling events at a rate proportional to their existing influence (\textbf{preferential attachment}), characteristic of real-world social and influence networks.
+
 
 \clearpage
 
@@ -416,7 +458,7 @@ This project successfully applied distributed graph mining techniques to uncover
     \item \textbf{Daniel Ingram} and Japanese electronic projects like \textbf{Denonbu} emerge as the new unexpected authorities, showcasing the immense structural influence of modern media franchises and internet culture on contemporary sampling.
     \item \textbf{James Brown} and classic funk icons remain foundational pillars, but now share the top echelon with digital-era creators.
     \item The network follows a strong \textbf{power-law distribution}: the top 1\% of artists control 23.6\% of all sampling events.
-    \item \textbf{13,971 genealogical families} detected with a modularity of 0.1926, indicating a highly interconnected and overlapping modern music landscape.
+    \item \textbf{13,855 genealogical families} detected with an intra-cluster edge fraction of 0.1926, indicating a highly interconnected and overlapping modern music landscape where 81\% of sampling crosses community boundaries.
     \item \textbf{Entity Resolution}: Transitioning to MusicBrainz GIDs revealed a vastly larger network (58k+ edges) than previously estimated using brittle string matching.
     \item \textbf{Convergence in 11 iterations} validates the optimized distributed PageRank implementation with proper sink-mass redistribution.
 \end{itemize}

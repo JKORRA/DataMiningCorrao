@@ -13,9 +13,7 @@ if not os.path.exists(graph_path) or not os.path.exists(pagerank_path):
     print("Error: Missing required parquet files. Run previous steps first.")
     exit(1)
 
-spark = SparkSession.builder \
-    .appName("MusicGenealogy_InteractiveViz") \
-    .getOrCreate()
+spark = SparkSession.builder.appName("MusicGenealogy_InteractiveViz").getOrCreate()
 
 df_pagerank = spark.read.parquet(pagerank_path)
 top_nodes = df_pagerank.orderBy(col("authority_score").desc()).limit(150)
@@ -26,37 +24,37 @@ top_artists = pdf_nodes["artist"].tolist()
 df_graph = spark.read.parquet(graph_path)
 # Keep edges where both source and target are in top_artists
 edges = df_graph.filter(
-    col("Original_Artist_Name").isin(top_artists) & 
-    col("Sampler_Artist_Name").isin(top_artists)
+    col("Original_Artist_Name").isin(top_artists)
+    & col("Sampler_Artist_Name").isin(top_artists)
 )
 
-edges = edges.groupBy(
-    col("Original_Artist_Name").alias("source"),
-    col("Sampler_Artist_Name").alias("target")
-).sum("weight").withColumnRenamed("sum(weight)", "weight")
+edges = (
+    edges.groupBy(
+        col("Original_Artist_Name").alias("source"),
+        col("Sampler_Artist_Name").alias("target"),
+    )
+    .sum("weight")
+    .withColumnRenamed("sum(weight)", "weight")
+)
 
 pdf_edges = edges.toPandas()
 spark.stop()
 
 nodes = []
 for idx, row in pdf_nodes.iterrows():
-    nodes.append({
-        "id": row["artist"],
-        "pagerank": float(row["authority_score"])
-    })
+    nodes.append({"id": row["artist"], "pagerank": float(row["authority_score"])})
 
 links = []
 for idx, row in pdf_edges.iterrows():
-    links.append({
-        "source": row["source"],
-        "target": row["target"],
-        "weight": float(row["weight"])
-    })
+    links.append(
+        {
+            "source": row["source"],
+            "target": row["target"],
+            "weight": float(row["weight"]),
+        }
+    )
 
-graph_data = {
-    "nodes": nodes,
-    "links": links
-}
+graph_data = {"nodes": nodes, "links": links}
 
 html_content = f"""<!DOCTYPE html>
 <html lang="en">
@@ -149,21 +147,35 @@ html_content = f"""<!DOCTYPE html>
         /* Legend */
         .legend {{
             position: fixed; bottom: 20px; right: 20px; z-index: 10;
-            padding: 14px 18px; border-radius: 10px;
-            background: rgba(30, 28, 46, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.06);
-            font-size: 11px; color: rgba(255,255,255,0.5);
+            padding: 16px 20px; border-radius: 12px;
+            background: rgba(30, 28, 46, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.1);
+            font-size: 12px; color: rgba(255,255,255,0.7);
+            min-width: 200px;
         }}
-        .legend div {{ display: flex; align-items: center; gap: 8px; margin: 3px 0; }}
+        .legend-title {{
+            font-weight: 600; margin-bottom: 12px; color: #ff8906;
+            font-size: 13px;
+        }}
+        .legend-item {{
+            display: flex; align-items: center; gap: 10px; margin: 6px 0;
+        }}
         .legend .dot {{
-            width: 10px; height: 10px; border-radius: 50%;
+            width: 12px; height: 12px; border-radius: 50%;
+            flex-shrink: 0;
         }}
+        .legend-arrow {{
+            display: flex; align-items: center; gap: 4px;
+            margin-top: 10px; padding-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }}
+        .legend-arrow svg {{ width: 48px; height: 16px; }}
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>Music Genealogy Network</h1>
+        <h1>Music Genealogy Network <span style="font-weight:400;font-size:14px;color:rgba(255,255,255,0.5);margin-left:8px;">Top 150 Artists by Authority</span></h1>
         <span class="hint">Scroll to zoom · Drag to pan · Click a node to explore</span>
     </div>
     <div id="tooltip" class="tooltip"></div>
@@ -174,10 +186,21 @@ html_content = f"""<!DOCTYPE html>
         <div class="connections" id="detail-connections"></div>
     </div>
     <div class="legend">
-        <div><span class="dot" style="background:#ff8906"></span> High authority</div>
-        <div><span class="dot" style="background:#e53170"></span> Medium authority</div>
-        <div><span class="dot" style="background:#7f5af0"></span> Low authority</div>
-        <div style="margin-top:6px; font-size:10px;">Arrow: sampler → original</div>
+        <div class="legend-title">Node Size = Authority</div>
+        <div class="legend-item"><span class="dot" style="background:#ff8906"></span> High authority</div>
+        <div class="legend-item"><span class="dot" style="background:#e53170"></span> Medium authority</div>
+        <div class="legend-item"><span class="dot" style="background:#7f5af0"></span> Low authority</div>
+        <div class="legend-arrow">
+            <svg viewBox="0 0 48 16">
+                <text x="0" y="11" fill="#fffffe" font-size="9">A</text>
+                <path d="M12,8 L32,8" stroke="rgba(255,136,6,0.8)" stroke-width="2" marker-end="url(#arrowhead-legend)"/>
+                <text x="36" y="11" fill="#fffffe" font-size="9">B</text>
+            </svg>
+            <span style="font-size:10px; color:rgba(255,255,255,0.5);">A sampled B</span>
+        </div>
+        <div style="margin-top:6px; font-size:10px; color:rgba(255,255,255,0.4);">
+            Arrow points from SAMPLER → ORIGINAL
+        </div>
     </div>
     <svg id="network"></svg>
 
@@ -222,18 +245,32 @@ html_content = f"""<!DOCTYPE html>
             return a === b || linkedByIndex[a.id + "," + b.id];
         }}
 
-        // Arrow marker
-        g.append("defs").append("marker")
+        // Arrow marker - more visible orange color
+        const defs = g.append("defs");
+        defs.append("marker")
             .attr("id", "arrowhead")
             .attr("viewBox", "0 -5 10 10")
-            .attr("refX", 20)
+            .attr("refX", 18)
             .attr("refY", 0)
-            .attr("markerWidth", 6)
-            .attr("markerHeight", 6)
+            .attr("markerWidth", 7)
+            .attr("markerHeight", 7)
             .attr("orient", "auto")
             .append("path")
             .attr("d", "M0,-4L10,0L0,4")
-            .attr("fill", "rgba(255,255,255,0.15)");
+            .attr("fill", "rgba(255,136,6,0.6)");
+        
+        // Legend arrow marker
+        defs.append("marker")
+            .attr("id", "arrowhead-legend")
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 8)
+            .attr("refY", 0)
+            .attr("markerWidth", 5)
+            .attr("markerHeight", 5)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M0,-4L10,0L0,4")
+            .attr("fill", "rgba(255,136,6,0.8)");
 
         const simulation = d3.forceSimulation(data.nodes)
             .force("link", d3.forceLink(data.links).id(d => d.id).distance(90))
@@ -245,8 +282,8 @@ html_content = f"""<!DOCTYPE html>
             .selectAll("line")
             .data(data.links)
             .join("line")
-            .attr("stroke", "rgba(255,255,255,0.07)")
-            .attr("stroke-width", d => Math.max(0.5, Math.sqrt(d.weight) * 0.6))
+            .attr("stroke", "rgba(255,136,6,0.25)")
+            .attr("stroke-width", d => Math.max(0.8, Math.sqrt(d.weight) * 0.7))
             .attr("marker-end", "url(#arrowhead)");
 
         const node = g.append("g")
@@ -310,8 +347,8 @@ html_content = f"""<!DOCTYPE html>
             node.transition().duration(300)
                 .attr("opacity", o => isConnected(d, o) ? 1 : 0.08);
             link.transition().duration(300)
-                .attr("stroke", l => (l.source === d || l.target === d) ? "rgba(255,137,6,0.5)" : "rgba(255,255,255,0.02)")
-                .attr("stroke-width", l => (l.source === d || l.target === d) ? 2 : 0.3);
+                .attr("stroke", l => (l.source === d || l.target === d) ? "rgba(255,136,6,0.8)" : "rgba(255,255,255,0.02)")
+                .attr("stroke-width", l => (l.source === d || l.target === d) ? 2.5 : 0.3);
             label.transition().duration(300)
                 .style("opacity", o => isConnected(d, o) ? 1 : 0);
 
@@ -320,13 +357,20 @@ html_content = f"""<!DOCTYPE html>
             document.getElementById("detail-name").textContent = d.id;
             document.getElementById("detail-score").innerHTML = `<span style="color:rgba(255,255,255,0.5)">Authority: ${{d.pagerank.toFixed(6)}}</span>`;
 
-            // Find connections
+            // Find connections - separate outgoing (samples) from incoming (sampled by)
             const conns = data.links.filter(l => l.source.id === d.id || l.target.id === d.id);
-            const connHTML = conns.map(l => {{
-                const other = l.source.id === d.id ? l.target.id : l.source.id;
-                const dir = l.source.id === d.id ? "sampled by →" : "← samples";
-                return `<div class="conn-item">${{other}} <span>${{dir}} (w:${{l.weight}})</span></div>`;
-            }}).join("");
+            const outgoing = conns.filter(l => l.source.id === d.id);
+            const incoming = conns.filter(l => l.target.id === d.id);
+            
+            let connHTML = "";
+            if (outgoing.length > 0) {{
+                connHTML += "<div style='color:#ff8906;font-size:11px;font-weight:600;margin:8px 0 4px 0;'>▼ SAMPLES (outgoing)</div>";
+                connHTML += outgoing.map(function(l) {{ return "<div class='conn-item'>→ " + l.target.id + " <span>(weight: " + l.weight + ")</span></div>"; }}).join("");
+            }}
+            if (incoming.length > 0) {{
+                connHTML += "<div style='color:#e53170;font-size:11px;font-weight:600;margin:8px 0 4px 0;'>▲ SAMPLED BY (incoming)</div>";
+                connHTML += incoming.map(function(l) {{ return "<div class='conn-item'>← " + l.source.id + " <span>(weight: " + l.weight + ")</span></div>"; }}).join("");
+            }}
             document.getElementById("detail-connections").innerHTML = connHTML || "<div class='conn-item' style='color:rgba(255,255,255,0.3)'>No connections in top 150</div>";
 
             panel.classList.add("visible");
@@ -340,8 +384,8 @@ html_content = f"""<!DOCTYPE html>
             selectedNode = null;
             node.transition().duration(300).attr("opacity", 1);
             link.transition().duration(300)
-                .attr("stroke", "rgba(255,255,255,0.07)")
-                .attr("stroke-width", d => Math.max(0.5, Math.sqrt(d.weight) * 0.6));
+                .attr("stroke", "rgba(255,136,6,0.25)")
+                .attr("stroke-width", d => Math.max(0.8, Math.sqrt(d.weight) * 0.7));
             label.transition().duration(300)
                 .style("opacity", d => sizeScale(d.pagerank) > 8 ? 1 : 0);
             document.getElementById("detail-panel").classList.remove("visible");
@@ -383,21 +427,6 @@ html_content = f"""<!DOCTYPE html>
                 .on("drag", dragged)
                 .on("end", dragended);
         }}
-
-        // Initial zoom-to-fit after simulation settles
-        simulation.on("end", () => {{
-            const bounds = g.node().getBBox();
-            const fullWidth = bounds.width;
-            const fullHeight = bounds.height;
-            const midX = bounds.x + fullWidth / 2;
-            const midY = bounds.y + fullHeight / 2;
-            const scale = 0.85 / Math.max(fullWidth / width, fullHeight / height);
-            const translate = [width / 2 - scale * midX, height / 2 - scale * midY];
-            svg.transition().duration(750).call(
-                zoom.transform,
-                d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
-            );
-        }});
     </script>
 </body>
 </html>

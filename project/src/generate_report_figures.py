@@ -38,60 +38,10 @@ print("\nLoading data...")
 df_graph = spark.read.parquet("outputs/music_graph.parquet")
 df_graph.cache()
 
-# Figure 1: Degree Distribution
-print("\n[1/8] Generating Degree Distribution Plot...")
 
-in_degree = (
-    df_graph.groupBy("Original_Artist_Name").agg(count("*").alias("degree")).toPandas()
-)
-
-out_degree = (
-    df_graph.groupBy("Sampler_Artist_Name").agg(count("*").alias("degree")).toPandas()
-)
-
-# Count frequency of each degree value
-in_degree_dist = in_degree["degree"].value_counts().sort_index()
-out_degree_dist = out_degree["degree"].value_counts().sort_index()
-
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-
-# In-Degree Distribution
-ax1.loglog(in_degree_dist.index, in_degree_dist.values, "o", alpha=0.6, markersize=4)
-ax1.set_xlabel("In-Degree (Times Sampled)", fontsize=11)
-ax1.set_ylabel("Frequency", fontsize=11)
-ax1.set_title("In-Degree Distribution (Log-Log Scale)", fontsize=12, fontweight="bold")
-ax1.grid(True, alpha=0.3, which="both", linestyle="--")
-ax1.text(
-    0.05,
-    0.95,
-    "Power-law behavior\nindicates scale-free network",
-    transform=ax1.transAxes,
-    verticalalignment="top",
-    bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
-)
-
-# Out-Degree Distribution
-ax2.loglog(
-    out_degree_dist.index,
-    out_degree_dist.values,
-    "o",
-    alpha=0.6,
-    markersize=4,
-    color="orange",
-)
-ax2.set_xlabel("Out-Degree (Samples Used)", fontsize=11)
-ax2.set_ylabel("Frequency", fontsize=11)
-ax2.set_title("Out-Degree Distribution (Log-Log Scale)", fontsize=12, fontweight="bold")
-ax2.grid(True, alpha=0.3, which="both", linestyle="--")
-
-plt.tight_layout()
-plt.savefig("figures/report_figures/fig1_degree_distribution.png", bbox_inches="tight")
-plt.savefig("figures/report_figures/fig1_degree_distribution.pdf", bbox_inches="tight")
-print("   ✓ Saved: fig1_degree_distribution.png/pdf")
-plt.close()
 
 # Figure 2: Volume vs Authority Comparison
-print("\n[2/8] Generating Volume vs Authority Comparison...")
+print("\n[1/5] Generating Volume vs Authority Comparison...")
 
 import re
 
@@ -167,42 +117,56 @@ except Exception as e:
     )
 
 # Figure 3: PageRank Convergence (placeholder)
-print("\n[3/8] Generating PageRank Convergence Plot...")
+print("\n[2/5] Generating PageRank Convergence Plot...")
 print("   ⚠ Note: Run PageRank with convergence logging to generate this plot")
 
 # Figure 4: Cluster Size Distribution
-print("\n[4/8] Generating Cluster Size Distribution...")
+print("\n[3/5] Generating Cluster Size Distribution...")
 
 try:
+    from pyspark.sql.functions import first, row_number
+    from pyspark.sql.window import Window
+    
     df_labels = spark.read.parquet("outputs/music_labels.parquet")
+    df_pagerank = spark.read.parquet("outputs/artist_pagerank.parquet")
 
-    cluster_sizes = (
-        df_labels.groupBy("cluster_representative")
-        .agg(count("*").alias("size"))
-        .toPandas()
-    )
+    df_cluster_auth = df_labels.join(df_pagerank, df_labels.artist_name == df_pagerank.artist, 'left')
+    window = Window.partitionBy('cluster_representative').orderBy(desc('authority_score'))
+    top_artist_per_cluster = df_cluster_auth.withColumn('rank', row_number().over(window)) \
+                                            .filter(col('rank') == 1)
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    cluster_sizes = df_labels.groupBy('cluster_representative').agg(count('*').alias('size'))
+    cluster_df = cluster_sizes.join(top_artist_per_cluster, 'cluster_representative') \
+                              .select('cluster_representative', 'size', 'artist') \
+                              .orderBy(desc('size')).toPandas()
 
-    # Histogram
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+
+    # Histogram - filled density style
+    # Use log-spaced bins for better visualization of power-law distribution
+    bins = np.logspace(np.log10(1), np.log10(cluster_df["size"].max()), 40)
     ax1.hist(
-        cluster_sizes["size"], bins=50, edgecolor="black", alpha=0.7, color="green"
+        cluster_df["size"], bins=bins,
+        edgecolor="white", alpha=0.8, color="#27ae60"
     )
-    ax1.set_xlabel("Cluster Size (Number of Songs)", fontsize=11)
-    ax1.set_ylabel("Frequency", fontsize=11)
-    ax1.set_title("Cluster Size Distribution", fontsize=12, fontweight="bold")
+    ax1.set_xscale("log")
     ax1.set_yscale("log")
-    ax1.grid(axis="y", alpha=0.3)
+    ax1.set_xlabel("Cluster Size (Number of Songs)", fontsize=11, fontweight="bold")
+    ax1.set_ylabel("Frequency", fontsize=11, fontweight="bold")
+    ax1.set_title("Cluster Size Distribution", fontsize=13, fontweight="bold")
+    ax1.grid(True, alpha=0.3, linestyle="--")
 
-    # Top 20 clusters
-    top_clusters = cluster_sizes.nlargest(20, "size")
-    ax2.barh(range(len(top_clusters)), top_clusters["size"], color="darkgreen")
+    # Top 20 clusters with semantic labels
+    top_clusters = cluster_df.head(20)
+    # create labels like "James Brown Cluster"
+    labels = [f"{artist} Cluster" if is_readable_name(artist) else f"Cluster {rep}" 
+              for artist, rep in zip(top_clusters["artist"], top_clusters["cluster_representative"])]
+              
+    ax2.barh(range(len(top_clusters)), top_clusters["size"], color="#1e8449")
     ax2.set_yticks(range(len(top_clusters)))
-    ax2.set_yticklabels(
-        [f"Cluster {i + 1}" for i in range(len(top_clusters))], fontsize=9
-    )
-    ax2.set_xlabel("Number of Songs", fontsize=11)
-    ax2.set_title("Top 20 Largest Clusters", fontsize=12, fontweight="bold")
+    ax2.set_yticklabels(labels, fontsize=9)
+    ax2.set_xlabel("Number of Songs", fontsize=11, fontweight="bold")
+    ax2.set_title("Top 20 Largest Communities\n(Labeled by Top Authority Artist)", fontsize=13, fontweight="bold")
     ax2.invert_yaxis()
     ax2.grid(axis="x", alpha=0.3)
 
@@ -217,10 +181,10 @@ try:
     plt.close()
 
     # Statistics
-    print(f"   Total clusters: {len(cluster_sizes):,}")
-    print(f"   Mean cluster size: {cluster_sizes['size'].mean():.2f}")
-    print(f"   Median cluster size: {cluster_sizes['size'].median():.0f}")
-    print(f"   Largest cluster: {cluster_sizes['size'].max():,} songs")
+    print(f"   Total clusters: {len(cluster_df):,}")
+    print(f"   Mean cluster size: {cluster_df['size'].mean():.2f}")
+    print(f"   Median cluster size: {cluster_df['size'].median():.0f}")
+    print(f"   Largest cluster: {cluster_df['size'].max():,} songs")
 
 except Exception as e:
     print(
@@ -228,7 +192,7 @@ except Exception as e:
     )
 
 # Figure 5: Graph Statistics Summary
-print("\n[5/8] Generating Graph Statistics Summary...")
+print("\n[4/5] Generating Graph Statistics Summary...")
 
 total_edges = df_graph.count()
 unique_samplers = df_graph.select("Sampler_Artist_Name").distinct().count()
@@ -271,182 +235,51 @@ out_stats = (
     .collect()[0]
 )
 
-# Create summary table
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.axis("tight")
-ax.axis("off")
 
-data = [
-    ["Metric", "Value"],
-    ["", ""],
-    ["Graph Structure", ""],
-    ["Total Sampling Events (Edges)", f"{total_edges:,}"],
-    ["Unique Songs (Nodes)", f"{unique_songs:,}"],
-    ["Unique Artists", f"{unique_artists:,}"],
-    ["  - Artists Who Sample", f"{unique_samplers:,}"],
-    ["  - Artists Being Sampled", f"{unique_originals:,}"],
-    ["", ""],
-    ["In-Degree Statistics (Times Sampled)", ""],
-    ["  Mean", f"{in_stats['mean']:.2f}"],
-    ["  Std Dev", f"{in_stats['std']:.2f}"],
-    ["  Maximum", f"{int(in_stats['max']):,}"],
-    ["", ""],
-    ["Out-Degree Statistics (Samples Used)", ""],
-    ["  Mean", f"{out_stats['mean']:.2f}"],
-    ["  Std Dev", f"{out_stats['std']:.2f}"],
-    ["  Maximum", f"{int(out_stats['max']):,}"],
-]
 
-table = ax.table(cellText=data, cellLoc="left", loc="center", colWidths=[0.6, 0.4])
-table.auto_set_font_size(False)
-table.set_fontsize(10)
-table.scale(1, 2)
-
-# Style the header
-for i in range(2):
-    table[(0, i)].set_facecolor("#4472C4")
-    table[(0, i)].set_text_props(weight="bold", color="white")
-
-# Style section headers
-for row in [2, 9, 14]:
-    table[(row, 0)].set_facecolor("#D9E1F2")
-    table[(row, 0)].set_text_props(weight="bold")
-    table[(row, 1)].set_facecolor("#D9E1F2")
-
-plt.subplots_adjust(top=0.95)
-plt.savefig("figures/report_figures/fig5_graph_statistics.png", bbox_inches="tight")
-plt.savefig("figures/report_figures/fig5_graph_statistics.pdf", bbox_inches="tight")
-print("   ✓ Saved: fig5_graph_statistics.png/pdf")
-plt.close()
-
-# Figure 6: Top Artists Comparison Table
-print("\n[6/8] Generating Top Artists Comparison Table...")
-
-try:
-    # Get top 10 by volume, filtered for readable names
-    top10_vol_all = (
-        df_graph.filter(col("Original_Artist_Name") != "[unknown]")
-        .groupBy("Original_Artist_Name")
-        .agg(count("*").alias("volume"))
-        .orderBy(desc("volume"))
-        .toPandas()
-    )
-    top10_vol_all = (
-        top10_vol_all[top10_vol_all["Original_Artist_Name"].apply(is_readable_name)]
-        .head(10)
-        .reset_index(drop=True)
-    )
-
-    # Get top 10 by authority, filtered for readable names
-    top10_auth_all = (
-        spark.read.parquet("outputs/artist_pagerank.parquet")
-        .orderBy(desc("authority_score"))
-        .toPandas()
-    )
-    top10_auth_all = (
-        top10_auth_all[top10_auth_all["artist"].apply(is_readable_name)]
-        .head(10)
-        .reset_index(drop=True)
-    )
-
-    fig, ax = plt.subplots(figsize=(14, 8))
-    ax.axis("tight")
-    ax.axis("off")
-
-    # Combine data
-    data = [
-        ["Rank", "By Volume (In-Degree)", "Count", "By Authority (PageRank)", "Score"]
-    ]
-
-    for i in range(10):
-        rank = i + 1
-        vol_artist = top10_vol_all.iloc[i]["Original_Artist_Name"][:35]
-        vol_count = int(top10_vol_all.iloc[i]["volume"])
-        auth_artist = top10_auth_all.iloc[i]["artist"][:35]
-        auth_score = f"{top10_auth_all.iloc[i]['authority_score']:.4f}"
-
-        data.append([str(rank), vol_artist, str(vol_count), auth_artist, auth_score])
-
-    table = ax.table(
-        cellText=data,
-        cellLoc="left",
-        loc="center",
-        colWidths=[0.08, 0.35, 0.12, 0.35, 0.12],
-    )
-    table.auto_set_font_size(False)
-    table.set_fontsize(9)
-    table.scale(1, 2.2)
-
-    # Style header
-    for i in range(5):
-        table[(0, i)].set_facecolor("#4472C4")
-        table[(0, i)].set_text_props(weight="bold", color="white")
-
-    # Alternate row colors
-    for i in range(1, 11):
-        color = "#F2F2F2" if i % 2 == 0 else "white"
-        for j in range(5):
-            table[(i, j)].set_facecolor(color)
-
-    plt.subplots_adjust(top=0.95)
-    plt.savefig(
-        "figures/report_figures/fig6_top_artists_comparison.png", bbox_inches="tight"
-    )
-    plt.savefig(
-        "figures/report_figures/fig6_top_artists_comparison.pdf", bbox_inches="tight"
-    )
-    print("   ✓ Saved: fig6_top_artists_comparison.png/pdf")
-    plt.close()
-
-    # Also generate LaTeX table (filtered)
-    with open("figures/report_figures/table_top10_comparison.tex", "w") as f:
-        f.write("% Top 10 Artists Comparison Table\n")
-        f.write("\\\\begin{table}[h]\n\\\\centering\n")
-        f.write("\\\\caption{Comparison of Top 10 Artists by Volume vs. Authority}\n")
-        f.write("\\\\label{tab:top10comparison}\n")
-        f.write("\\\\begin{tabular}{clrclr}\n\\\\toprule\n")
-        f.write(
-            "\\\\multicolumn{3}{c}{\\\\textbf{By Volume}} & \\\\multicolumn{3}{c}{\\\\textbf{By Authority}} \\\\\\\\\n"
-        )
-        f.write("\\\\cmidrule(r){1-3} \\\\cmidrule(l){4-6}\n")
-        f.write("Rank & Artist & Count & Rank & Artist & Score \\\\\\\\\n\\\\midrule\n")
-        for i in range(10):
-            va = top10_vol_all.iloc[i]["Original_Artist_Name"].replace("&", "\\\\&")
-            vc = int(top10_vol_all.iloc[i]["volume"])
-            aa = top10_auth_all.iloc[i]["artist"].replace("&", "\\\\&")
-            ascore = f"{top10_auth_all.iloc[i]['authority_score']:.4f}"
-            f.write(f"{i + 1} & {va} & {vc} & {i + 1} & {aa} & {ascore} \\\\\\\\\n")
-        f.write("\\\\bottomrule\n\\\\end{tabular}\n\\\\end{table}\n")
-    print("   ✓ Saved: table_top10_comparison.tex")
-
-except Exception as e:
-    print(f"   ⚠ Warning: Could not generate comparison table: {e}")
+# Figure 6: Top Artists Comparison Table (LaTeX table generated in BONUS section below)
+print("\n[5/5] Top artists comparison table generated via LaTeX in BONUS section")
 
 # Figure 7: Power-Law Analysis
-print("\n[7/8] Generating Power-Law Analysis...")
+print("\n[7/7] Generating Power-Law Analysis...")
 
-# Calculate cumulative distribution
-in_degree_sorted = (
-    in_degree["degree"].sort_values(ascending=False).reset_index(drop=True)
+# Compute degree distributions for power-law analysis
+in_degree = (
+    df_graph.groupBy("Original_Artist_Name")
+    .agg(count("*").alias("degree"))
+    .toPandas()
 )
-cumulative = [(i + 1) / len(in_degree_sorted) for i in range(len(in_degree_sorted))]
 
-fig, ax = plt.subplots(figsize=(8, 6))
-ax.loglog(in_degree_sorted, cumulative, "o", alpha=0.5, markersize=3)
-ax.set_xlabel("Degree (Times Sampled)", fontsize=11)
-ax.set_ylabel("P(X ≥ x) - Cumulative Probability", fontsize=11)
-ax.set_title(
-    "Cumulative Degree Distribution (Power-Law Test)", fontsize=12, fontweight="bold"
+out_degree = (
+    df_graph.groupBy("Sampler_Artist_Name")
+    .agg(count("*").alias("degree"))
+    .toPandas()
 )
-ax.grid(True, alpha=0.3, which="both", linestyle="--")
+
+# Calculate cumulative distribution for In-Degree
+in_degree_sorted = in_degree["degree"].sort_values(ascending=False).reset_index(drop=True)
+in_cum = [(i + 1) / len(in_degree_sorted) for i in range(len(in_degree_sorted))]
+
+# Calculate cumulative distribution for Out-Degree
+out_degree_sorted = out_degree["degree"].sort_values(ascending=False).reset_index(drop=True)
+out_cum = [(i + 1) / len(out_degree_sorted) for i in range(len(out_degree_sorted))]
+
+fig, ax = plt.subplots(figsize=(9, 7))
+ax.loglog(in_degree_sorted, in_cum, "o", alpha=0.6, markersize=4, color="#3498db", label="In-Degree (Times Sampled)")
+ax.loglog(out_degree_sorted, out_cum, "s", alpha=0.5, markersize=4, color="#e67e22", label="Out-Degree (Samples Used)")
+
+ax.set_xlabel("Degree", fontsize=12, fontweight="bold")
+ax.set_ylabel("P(X ≥ x) - Cumulative Probability", fontsize=12, fontweight="bold")
+ax.set_title("Power-Law Validation: Cumulative Degree Distributions", fontsize=14, fontweight="bold")
+ax.grid(True, alpha=0.4, which="both", linestyle="--")
 
 # Add reference line
-x_ref = np.logspace(0, np.log10(in_degree_sorted.max()), 100)
-y_ref = (x_ref / in_degree_sorted.max()) ** (-1.5)
-ax.plot(
-    x_ref, y_ref, "r--", linewidth=2, label="Reference Power-Law (α=1.5)", alpha=0.7
-)
-ax.legend()
+max_degree = max(in_degree_sorted.max(), out_degree_sorted.max())
+x_ref = np.logspace(0, np.log10(max_degree), 100)
+y_ref = (x_ref / max_degree) ** (-1.5)
+ax.plot(x_ref, y_ref, "r--", linewidth=2.5, label="Reference Power-Law (α ≈ 1.5)", alpha=0.8)
+
+ax.legend(fontsize=11, framealpha=0.9)
 
 plt.tight_layout()
 plt.savefig("figures/report_figures/fig7_powerlaw_analysis.png", bbox_inches="tight")
@@ -475,167 +308,6 @@ print(f"\n   Concentration Analysis:")
 print(f"   Top 1% of artists: {top1_share:.1f}% of all sampling events")
 print(f"   Top 5% of artists: {top5_share:.1f}% of all sampling events")
 print(f"   Top 10% of artists: {top10_share:.1f}% of all sampling events")
-
-# Figure 8: Methodology Flowchart
-print("\n[8/8] Generating Methodology Summary...")
-
-fig, ax = plt.subplots(figsize=(10, 8))
-ax.axis("off")
-
-# Create flowchart boxes
-boxes = [
-    {
-        "text": "MusicBrainz Database\n(Raw PostgreSQL Dumps)",
-        "y": 0.95,
-        "color": "#E7E6E6",
-    },
-    {
-        "text": "Data Preparation\n• Schema-on-Read\n• Semantic Filtering (link_type 69, 231)\n• Multi-table Joins",
-        "y": 0.80,
-        "color": "#D6E4F5",
-    },
-    {"text": "Music Sampling Graph\n(Parquet Storage)", "y": 0.65, "color": "#E7E6E6"},
-    {"text": "Analysis Phase", "y": 0.52, "color": "#FFF2CC"},
-    {
-        "text": "Volume Analysis\n(Degree Centrality)",
-        "y": 0.38,
-        "color": "#D5E8D4",
-        "x": 0.20,
-    },
-    {
-        "text": "Authority Analysis\n(PageRank)",
-        "y": 0.38,
-        "color": "#D5E8D4",
-        "x": 0.50,
-    },
-    {
-        "text": "Community Detection\n(Label Propagation)",
-        "y": 0.38,
-        "color": "#D5E8D4",
-        "x": 0.80,
-    },
-    {
-        "text": "Validation & Results\n• Statistical Metrics\n• Visualizations\n• Quality Assessment",
-        "y": 0.20,
-        "color": "#F8CECC",
-    },
-    {
-        "text": "Research Insights\n• Video Game Music → Hip Hop\n• Authority vs. Volume\n• Genealogical Families",
-        "y": 0.05,
-        "color": "#E1D5E7",
-    },
-]
-
-for box in boxes:
-    x = box.get("x", 0.50)
-    y = box["y"]
-    bbox = dict(
-        boxstyle="round,pad=0.8",
-        facecolor=box["color"],
-        edgecolor="black",
-        linewidth=1.5,
-    )
-    ax.text(
-        x,
-        y,
-        box["text"],
-        ha="center",
-        va="center",
-        fontsize=9,
-        bbox=bbox,
-        transform=ax.transAxes,
-        fontweight="bold",
-    )
-
-# Add arrows
-arrow_props = dict(arrowstyle="->", lw=2, color="black")
-ax.annotate(
-    "",
-    xy=(0.50, 0.75),
-    xytext=(0.50, 0.88),
-    arrowprops=arrow_props,
-    transform=ax.transAxes,
-)
-ax.annotate(
-    "",
-    xy=(0.50, 0.60),
-    xytext=(0.50, 0.70),
-    arrowprops=arrow_props,
-    transform=ax.transAxes,
-)
-ax.annotate(
-    "",
-    xy=(0.50, 0.47),
-    xytext=(0.50, 0.57),
-    arrowprops=arrow_props,
-    transform=ax.transAxes,
-)
-
-# Arrows from "Analysis Phase" to three methods
-ax.annotate(
-    "",
-    xy=(0.20, 0.43),
-    xytext=(0.45, 0.48),
-    arrowprops=arrow_props,
-    transform=ax.transAxes,
-)
-ax.annotate(
-    "",
-    xy=(0.50, 0.43),
-    xytext=(0.50, 0.48),
-    arrowprops=arrow_props,
-    transform=ax.transAxes,
-)
-ax.annotate(
-    "",
-    xy=(0.80, 0.43),
-    xytext=(0.55, 0.48),
-    arrowprops=arrow_props,
-    transform=ax.transAxes,
-)
-
-# Arrows from three methods to Validation
-ax.annotate(
-    "",
-    xy=(0.45, 0.25),
-    xytext=(0.20, 0.33),
-    arrowprops=arrow_props,
-    transform=ax.transAxes,
-)
-ax.annotate(
-    "",
-    xy=(0.50, 0.25),
-    xytext=(0.50, 0.33),
-    arrowprops=arrow_props,
-    transform=ax.transAxes,
-)
-ax.annotate(
-    "",
-    xy=(0.55, 0.25),
-    xytext=(0.80, 0.33),
-    arrowprops=arrow_props,
-    transform=ax.transAxes,
-)
-
-# Arrow to final insights
-ax.annotate(
-    "",
-    xy=(0.50, 0.10),
-    xytext=(0.50, 0.15),
-    arrowprops=arrow_props,
-    transform=ax.transAxes,
-)
-
-plt.title("Methodology Overview", fontsize=14, fontweight="bold", pad=20)
-plt.tight_layout()
-plt.savefig(
-    "figures/report_figures/fig8_methodology_flowchart.png", bbox_inches="tight"
-)
-plt.savefig(
-    "figures/report_figures/fig8_methodology_flowchart.pdf", bbox_inches="tight"
-)
-print("   ✓ Saved: fig8_methodology_flowchart.png/pdf")
-plt.close()
 
 # Generate LaTeX tables
 print("\n[BONUS] Generating LaTeX tables...")
@@ -754,13 +426,9 @@ print("REPORT FIGURES GENERATION COMPLETE")
 print("=" * 80)
 print(f"\nAll figures saved to: report_figures/")
 print("\nGenerated files:")
-print("  • fig1_degree_distribution.png/pdf - Power-law degree distribution")
 print("  • fig2_volume_vs_authority.png/pdf - Top 20 comparison")
 print("  • fig4_cluster_distribution.png/pdf - Cluster size analysis")
-print("  • fig5_graph_statistics.png/pdf - Summary statistics table")
-print("  • fig6_top_artists_comparison.png/pdf - Top 10 detailed comparison")
 print("  • fig7_powerlaw_analysis.png/pdf - Cumulative distribution")
-print("  • fig8_methodology_flowchart.png/pdf - Project methodology")
 print("  • table_top10_comparison.tex - LaTeX table")
 print("  • statistics_summary.txt - Text summary for report")
 

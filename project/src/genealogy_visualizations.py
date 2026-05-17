@@ -112,27 +112,28 @@ for _, row in artist_edges.iterrows():
 volume_dict = dict(
     zip(readable_volume["Original_Artist_Name"], readable_volume["in_degree"])
 )
-node_sizes = [volume_dict.get(node, 5) * 5 for node in G_top.nodes()]
+node_sizes = [volume_dict.get(node, 5) * 12 for node in G_top.nodes()]
 node_colors = [
-    "#FF6B6B" if node in top_artists else "#A0D8EF" for node in G_top.nodes()
+    "#E74C3C" if node in top_artists else "#3498DB" for node in G_top.nodes()
 ]
 
-pos = nx.spring_layout(G_top, k=2.5, iterations=200, seed=42)
+pos = nx.spring_layout(G_top, k=3.5, iterations=300, seed=42)
 fig, ax = plt.subplots(figsize=(18, 14))
 
 edges = G_top.edges()
 if edges:
     weights = [G_top[u][v]["weight"] for u, v in edges]
+    max_w = max(weights) if weights else 1
     nx.draw_networkx_edges(
         G_top,
         pos,
-        edge_color="#666666",
-        width=[w * 0.8 / 3 for w in weights],
-        alpha=0.4,
+        edge_color="#7f8c8d",
+        width=[(w / max_w) * 6 + 1 for w in weights],
+        alpha=0.6,
         arrows=True,
-        arrowsize=15,
-        arrowstyle="->",
-        connectionstyle="arc3,rad=0.1",
+        arrowsize=25,
+        arrowstyle="-|>",
+        connectionstyle="arc3,rad=0.15",
         node_size=node_sizes,
         ax=ax,
     )
@@ -142,7 +143,7 @@ nx.draw_networkx_nodes(
     pos,
     node_size=node_sizes,
     node_color=node_colors,
-    edgecolors="#2C5AA0",
+    edgecolors="white",
     linewidths=2.5,
     ax=ax,
 )
@@ -155,16 +156,15 @@ for i, node in enumerate(top_artists):
             x,
             y,
             node,
-            fontsize=10,
+            fontsize=13,
             fontweight="bold",
             ha="center",
             va="center",
             bbox=dict(
-                boxstyle="round,pad=0.4",
+                boxstyle="round,pad=0.3",
                 facecolor="white",
-                edgecolor="#2C5AA0",
-                linewidth=1.5,
-                alpha=0.95,
+                edgecolor="none",
+                alpha=0.8,
             ),
         )
 
@@ -205,155 +205,7 @@ plt.savefig(f"{output_dir}/fig1_top15_sampling_network.pdf", bbox_inches="tight"
 print(f"✓ Saved: fig1_top15_sampling_network.png/pdf\n")
 plt.close()
 
-# =============================================================================
-# FIGURE 5: SAMPLING FLOW - BIPARTITE
-# =============================================================================
-print("=" * 80)
-print("[FIGURE 5] Sampling Flow - Samplers → Sampled")
-print("=" * 80)
 
-# Top 10 samplers by out-degree, readable names only
-all_samplers = (
-    df_graph.filter(col("Sampler_Artist_Name") != "[unknown]")
-    .groupBy("Sampler_Artist_Name")
-    .agg(count("*").alias("total_samples"))
-    .orderBy(desc("total_samples"))
-    .toPandas()
-)
-all_samplers = all_samplers[all_samplers["Sampler_Artist_Name"].apply(is_readable)]
-top_samplers = all_samplers.head(10)["Sampler_Artist_Name"].tolist()
-
-# Top 10 sampled by in-degree, readable names only
-all_sampled = (
-    df_graph.filter(col("Original_Artist_Name") != "[unknown]")
-    .groupBy("Original_Artist_Name")
-    .agg(count("*").alias("times_sampled"))
-    .orderBy(desc("times_sampled"))
-    .toPandas()
-)
-all_sampled = all_sampled[all_sampled["Original_Artist_Name"].apply(is_readable)]
-top_sampled = all_sampled.head(10)["Original_Artist_Name"].tolist()
-
-flow_edges = (
-    df_graph.filter(
-        col("Sampler_Artist_Name").isin(top_samplers)
-        & col("Original_Artist_Name").isin(top_sampled)
-    )
-    .groupBy("Sampler_Artist_Name", "Original_Artist_Name")
-    .agg(count("*").alias("weight"))
-    .filter(col("weight") >= 2)
-    .toPandas()
-)
-
-print(f"Found {len(flow_edges)} connections (weight >= 2)")
-
-G_flow = nx.DiGraph()
-for sampler in top_samplers:
-    G_flow.add_node(sampler, bipartite=0)
-for sampled in top_sampled:
-    G_flow.add_node(sampled, bipartite=1)
-
-for _, row in flow_edges.iterrows():
-    G_flow.add_edge(
-        row["Sampler_Artist_Name"], row["Original_Artist_Name"], weight=row["weight"]
-    )
-
-left_nodes = [n for n in G_flow.nodes() if G_flow.nodes[n]["bipartite"] == 0]
-right_nodes = [n for n in G_flow.nodes() if G_flow.nodes[n]["bipartite"] == 1]
-
-pos = {}
-y_spacing = 1.0
-for i, node in enumerate(left_nodes):
-    pos[node] = (0, i * y_spacing)
-for i, node in enumerate(right_nodes):
-    pos[node] = (3, i * y_spacing)
-
-fig, ax = plt.subplots(figsize=(16, 12))
-
-for u, v, data in G_flow.edges(data=True):
-    weight = data["weight"]
-    ax.plot(
-        [pos[u][0], pos[v][0]],
-        [pos[u][1], pos[v][1]],
-        "#888888",
-        linewidth=min(weight * 0.6, 6),
-        alpha=0.5,
-        zorder=1,
-    )
-
-for node in left_nodes:
-    ax.scatter(
-        pos[node][0],
-        pos[node][1],
-        s=800,
-        c="#87CEEB",
-        edgecolors="#4682B4",
-        linewidth=3,
-        zorder=2,
-    )
-    ax.text(
-        pos[node][0] - 0.3,
-        pos[node][1],
-        node,
-        ha="right",
-        va="center",
-        fontsize=11,
-        fontweight="bold",
-    )
-
-for node in right_nodes:
-    ax.scatter(
-        pos[node][0],
-        pos[node][1],
-        s=800,
-        c="#FFB6C1",
-        edgecolors="#DC143C",
-        linewidth=3,
-        zorder=2,
-    )
-    ax.text(
-        pos[node][0] + 0.3,
-        pos[node][1],
-        node,
-        ha="left",
-        va="center",
-        fontsize=11,
-        fontweight="bold",
-    )
-
-ax.text(
-    0,
-    -1,
-    "TOP SAMPLERS\n(High Out-Degree)",
-    ha="center",
-    fontsize=13,
-    fontweight="bold",
-    color="#4682B4",
-)
-ax.text(
-    3,
-    -1,
-    "TOP SAMPLED\n(High In-Degree / Authority)",
-    ha="center",
-    fontsize=13,
-    fontweight="bold",
-    color="#DC143C",
-)
-
-ax.set_title(
-    "Sampling Flow: Who Samples Whom?\n(Line Thickness = Number of Samples, Only connections ≥ 2 shown)",
-    fontsize=16,
-    fontweight="bold",
-    pad=25,
-)
-ax.set_xlim(-1, 4)
-ax.set_ylim(-2, max(len(left_nodes), len(right_nodes)))
-ax.axis("off")
-plt.tight_layout()
-plt.savefig(f"{output_dir}/fig6_sampling_flow.png", dpi=300, bbox_inches="tight")
-plt.savefig(f"{output_dir}/fig6_sampling_flow.pdf", bbox_inches="tight")
-print(f"✓ Saved: fig6_sampling_flow.png/pdf\n")
-plt.close()
 
 # =============================================================================
 # FIGURE 6: HUB ANALYSIS - filtered
@@ -384,96 +236,142 @@ degree_df = degree_df[degree_df["artist"].apply(is_readable)]
 # Get top 15 by volume for labeling (more recognizable than PageRank top 15)
 top_15_vol = readable_volume.head(15)["Original_Artist_Name"].tolist()
 
+# Get pagerank for colors
+df_pr = df_pagerank.toPandas()
+degree_df = degree_df.merge(df_pr, on="artist", how="left")
+degree_df["authority_score"] = degree_df["authority_score"].fillna(0.1)
+
+# Convert to log+1 scale for better visual separation without negative axes
+degree_df["in_degree_log"] = degree_df["in_degree"] + 1
+degree_df["out_degree_log"] = degree_df["out_degree"] + 1
+
+import matplotlib.colors as mcolors
+
 fig, ax = plt.subplots(figsize=(14, 11))
 
-ax.scatter(
-    degree_df["out_degree"],
-    degree_df["in_degree"],
-    s=40,
-    alpha=0.4,
-    c="#B0B0B0",
+sc = ax.scatter(
+    degree_df["out_degree_log"],
+    degree_df["in_degree_log"],
+    s=30,
+    alpha=0.15,
+    c=degree_df["authority_score"],
+    cmap="viridis",
     edgecolors="none",
-    label="Other Artists",
+    norm=mcolors.LogNorm(vmin=0.1, vmax=degree_df["authority_score"].max()),
+    label="Other Artists"
 )
 
 top_df = degree_df[degree_df["artist"].isin(top_15_vol)]
 ax.scatter(
-    top_df["out_degree"],
-    top_df["in_degree"],
+    top_df["out_degree_log"],
+    top_df["in_degree_log"],
     s=250,
     c="#E74C3C",
     edgecolors="#C0392B",
     linewidth=2.5,
     zorder=5,
-    label="Top 15 Most Sampled",
+    label="Top 15 Most Sampled"
 )
 
+from adjustText import adjust_text
+
+# Only label the top 7 to avoid extreme clutter while retaining the 15 red dots
+labels_to_show = top_15_vol[:7]
+
+texts = []
 for _, row in top_df.iterrows():
+    if row["artist"] not in labels_to_show:
+        continue
     label = row["artist"] if len(row["artist"]) <= 18 else row["artist"][:16] + "..."
-    ax.annotate(
-        label,
-        (row["out_degree"], row["in_degree"]),
-        xytext=(10, 8),
-        textcoords="offset points",
-        fontsize=9,
-        fontweight="bold",
-        bbox=dict(
-            boxstyle="round,pad=0.4",
-            facecolor="#FFFACD",
-            edgecolor="#E74C3C",
-            alpha=0.9,
-        ),
-        arrowprops=dict(
-            arrowstyle="->", connectionstyle="arc3,rad=0.2", color="#E74C3C", lw=1.5
-        ),
+    texts.append(
+        ax.text(
+            row["out_degree_log"],
+            row["in_degree_log"],
+            label,
+            fontsize=10,
+            fontweight="bold",
+            bbox=dict(
+                boxstyle="round,pad=0.3",
+                facecolor="#FFFACD",
+                edgecolor="#E74C3C",
+                alpha=0.9,
+            )
+        )
     )
 
-median_in = degree_df["in_degree"].median()
-median_out = degree_df["out_degree"].median()
+adjust_text(
+    texts,
+    arrowprops=dict(arrowstyle="->", color="#E74C3C", lw=1.5),
+    expand_points=(1.5, 1.5)
+)
+
+median_in = degree_df["in_degree_log"].median()
+median_out = degree_df["out_degree_log"].median()
 ax.axhline(y=median_in, color="gray", linestyle="--", alpha=0.5, linewidth=1.5)
 ax.axvline(x=median_out, color="gray", linestyle="--", alpha=0.5, linewidth=1.5)
 
-max_out = degree_df["out_degree"].max()
-max_in = degree_df["in_degree"].max()
-
+# Anchor quadrant labels to axes relative coordinates so they never overlap
 ax.text(
-    max_out * 0.75,
-    max_in * 0.85,
+    0.95,
+    0.95,
     "BRIDGES\n(Sample & Get Sampled)",
-    ha="center",
+    transform=ax.transAxes,
+    ha="right",
+    va="top",
     fontsize=11,
     fontweight="bold",
     bbox=dict(boxstyle="round", facecolor="#E8F5E9", alpha=0.8),
 )
 ax.text(
-    max_out * 0.15,
-    max_in * 0.85,
+    0.05,
+    0.95,
     "AUTHORITIES\n(Pure Sources)",
-    ha="center",
+    transform=ax.transAxes,
+    ha="left",
+    va="top",
     fontsize=11,
     fontweight="bold",
     bbox=dict(boxstyle="round", facecolor="#FFF3E0", alpha=0.8),
 )
 ax.text(
-    max_out * 0.75,
-    max_in * 0.15,
+    0.95,
+    0.05,
     "HEAVY SAMPLERS\n(Use Many Samples)",
-    ha="center",
+    transform=ax.transAxes,
+    ha="right",
+    va="bottom",
     fontsize=11,
     fontweight="bold",
     bbox=dict(boxstyle="round", facecolor="#E3F2FD", alpha=0.8),
 )
+ax.text(
+    0.05,
+    0.05,
+    "PERIPHERAL\n(Low Activity)",
+    transform=ax.transAxes,
+    ha="left",
+    va="bottom",
+    fontsize=11,
+    fontweight="bold",
+    bbox=dict(boxstyle="round", facecolor="#F5F5F5", alpha=0.8),
+)
 
-ax.set_xlabel("Out-Degree (Number of Samples Used)", fontsize=13, fontweight="bold")
-ax.set_ylabel("In-Degree (Times Being Sampled)", fontsize=13, fontweight="bold")
+ax.set_xlabel("Out-Degree (Number of Samples Used + 1)", fontsize=13, fontweight="bold")
+ax.set_ylabel("In-Degree (Times Being Sampled + 1)", fontsize=13, fontweight="bold")
 ax.set_title(
-    "Artist Hub Analysis: Sampling Behavior\n(Red = Top 15 Most Sampled Artists)",
+    "Artist Hub Analysis: Sampling Behavior\n(Color = PageRank Authority, Scale = Log-Log)",
     fontsize=16,
     fontweight="bold",
     pad=20,
 )
+ax.set_xscale("log")
+ax.set_yscale("log")
+
+cbar = plt.colorbar(sc, ax=ax)
+cbar.set_label("Authority Score (PageRank)", fontsize=11, fontweight="bold")
+
 ax.grid(True, alpha=0.3, linestyle=":", linewidth=1)
-ax.legend(loc="upper right", fontsize=11, framealpha=0.95)
+ax.legend(loc="lower left", fontsize=11, framealpha=0.95)
 
 plt.tight_layout()
 plt.savefig(f"{output_dir}/fig7_hub_analysis.png", dpi=300, bbox_inches="tight")

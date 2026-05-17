@@ -34,8 +34,7 @@ project/
 │   └── ... (11 files total)
 │
 ├── figures/                # Generated visualizations
-│   ├── report_figures/    # 8 statistical plots
-│   └── genealogy_networks/ # 5 network diagrams
+│   └── report_figures/    # All statistical plots and network diagrams
 │
 ├── mbdump/                 # MusicBrainz raw data (input)
 │   └── ... (140+ TSV files)
@@ -100,7 +99,7 @@ python3 src/compute_authority_manual.py
   - Output: `outputs/validation_summary.csv/`
   
 - **cluster_quality.py**
-  - Modularity calculation
+  - Intra-cluster edge fraction (simplified modularity) calculation
   - Cluster size distribution
   - Bridge analysis (inter-cluster connections)
   - Output: `outputs/cluster_quality_summary.csv/`
@@ -112,14 +111,13 @@ python3 src/compute_authority_manual.py
 
 ### Visualization
 - **generate_report_figures.py** (23,159 bytes)
-  - Generates 8 statistical plots for report
-  - Degree distributions, rankings, cluster analysis
+  - Generates statistical plots for report
+  - Rankings, cluster analysis, power-law validation
   - Output: `figures/report_figures/` (PNG + PDF)
   
 - **genealogy_visualizations.py** (21,864 bytes)
-  - Generates 5 network diagrams
-  - Sampling networks, ego networks, hub analysis
-  - Output: `figures/genealogy_networks/` (PNG + PDF)
+  - Generates network diagrams: top 15 sampling network, hub analysis
+  - Output: `figures/report_figures/` (PNG + PDF)
 
 ### Utilities
 - **analyze_selfloops.py**
@@ -142,12 +140,12 @@ All analysis results are stored in `outputs/`:
 
 | File | Size | Description |
 |------|------|-------------|
-| music_graph.parquet/ | ~15MB | Cleaned graph (20,728 edges, 30,021 nodes) |
+| music_graph.parquet/ | ~15MB | Cleaned graph (58,621 song-level edges, 68,527 nodes, 23,503 unique artists) |
 | artist_pagerank.parquet/ | ~2MB | PageRank scores for all artists |
 | music_labels.parquet/ | ~8MB | Cluster assignments for each song |
 | music_clusters.csv/ | ~250KB | Cluster sizes and members |
 | validation_summary.csv/ | ~5KB | Network statistics summary |
-| cluster_quality_summary.csv/ | ~3KB | Modularity and quality metrics |
+| cluster_quality_summary.csv/ | ~3KB | Intra-cluster edge fraction and quality metrics |
 | top_100_artists_pagerank.csv/ | ~8KB | Top 100 artists by authority |
 | cluster_sizes.csv/ | ~200KB | Detailed cluster distribution |
 | cluster_bridges.csv/ | ~50KB | Inter-cluster connections |
@@ -159,21 +157,18 @@ All analysis results are stored in `outputs/`:
 ## 🎨 Generated Figures
 
 ### Statistical Plots (`figures/report_figures/`)
-1. **fig1_degree_distribution.png/pdf** - Power-law degree distribution
-2. **fig2_volume_vs_authority.png/pdf** - Top 20 comparison (in-degree vs PageRank)
-3. **fig4_cluster_distribution.png/pdf** - Cluster size histogram
-4. **fig5_graph_statistics.png/pdf** - Network metrics table
-5. **fig6_top_artists_comparison.png/pdf** - Top 10 detailed comparison
-6. **fig7_powerlaw_analysis.png/pdf** - Cumulative distribution
-7. **fig8_methodology_flowchart.png/pdf** - Project workflow
-8. **statistics_summary.txt** - Text statistics
+1. **fig2_volume_vs_authority.png/pdf** - Top 20 comparison (in-degree vs PageRank)
+2. **fig4_cluster_distribution.png/pdf** - Cluster size histogram
+3. **fig6_top_artists_comparison.png/pdf** - Top 10 detailed comparison
+4. **fig7_powerlaw_analysis.png/pdf** - Cumulative degree distribution (log-log)
+5. **statistics_summary.txt** - Text statistics
 
-### Network Diagrams (`figures/genealogy_networks/`)
-1. **fig1_top15_sampling_network.png/pdf** - Core sampling relationships
-2. **fig2_jamesbrown_ego_network.png/pdf** - James Brown influence sphere
-3. **fig3_kojikondo_ego_network.png/pdf** - Video game music influence
-4. **fig4_sampling_flow.png/pdf** - Bipartite flow diagram
-5. **fig5_hub_analysis.png/pdf** - In-degree vs out-degree scatter
+### Network Diagrams (`figures/report_figures/`)
+1. **fig1_top15_sampling_network.png/pdf** - Core sampling relationships among top 15
+2. **fig7_hub_analysis.png/pdf** - Hub analysis: in-degree vs out-degree scatter
+3. **fig9_top_bridges.png/pdf** - Top 15 evolutionary bridges
+4. **fig10_authority_composition.png/pdf** - Internal vs external influence
+5. **fig11_macro_community_flow.png/pdf** - Macroscopic inter-community sampling flow
 
 All figures are 300 DPI, publication-quality.
 

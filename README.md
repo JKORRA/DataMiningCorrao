@@ -15,7 +15,7 @@ This project analyzes the **genealogy of music** through sampling relationships,
 - **58,621 sampling events** connecting 68,527 songs across 23,503 artists
 - **Daniel Ingram** emerges as the top structural authority (PageRank: 59.38, Anime/Musical theater composer)
 - **James Brown** is the #2 authority (PageRank: 45.43, 204 samples) - the classic "Godfather of Soul"
-- **13,971 musical communities** detected (modularity: 0.1926)
+- **13,855 musical communities** detected (intra-cluster edge fraction: 0.1926)
 - **Power-law concentration**: Top 1% of artists control 23.6% of all sampling events
 - Full support for **CJK (Chinese/Japanese/Korean) Unicode characters** in artist names and visualizations
 
@@ -142,22 +142,21 @@ python3 src/genealogy_visualizations.py
 - `music_graph.parquet/` - Cleaned graph (58,621 edges, no self-loops)
 - `artist_pagerank.parquet/` - PageRank scores for all artists
 - `music_clusters.csv/` - Song-to-cluster assignments
-- `music_labels.parquet/` - Label propagation results (13,971 clusters)
+- `music_labels.parquet/` - Label propagation results (13,855 clusters)
 - `interactive_genealogy.html` - **D3.js interactive visualization** (see below)
 
 ### Visualizations (`project/figures/report_figures/`)
 
 **Figures**:
-1. `fig1_degree_distribution.png/pdf` - Power-law degree distribution
+1. `fig1_top15_sampling_network.png/pdf` - Top 15 artists inter-connection network
 2. `fig2_volume_vs_authority.png/pdf` - Top 20 comparison (in-degree vs PageRank)
 3. `fig4_cluster_distribution.png/pdf` - Cluster size histogram & top 20
-4. `fig5_graph_statistics.png/pdf` - Network metrics summary table
-5. `fig6_top_artists_comparison.png/pdf` - Top 10 detailed comparison
-6. `fig7_powerlaw_analysis.png/pdf` - Cumulative distribution (log-log)
-7. `fig8_methodology_flowchart.png/pdf` - Project workflow diagram
-8. `fig1_top15_sampling_network.png/pdf` - Top 15 artists inter-connection network
-9. `fig6_sampling_flow.png/pdf` - Bipartite sampling flow (samplers → sampled)
-10. `fig7_hub_analysis.png/pdf` - Hub classification (in-degree vs out-degree)
+4. `fig6_top_artists_comparison.png/pdf` - Top 10 detailed comparison
+5. `fig7_powerlaw_analysis.png/pdf` - Cumulative distribution (log-log)
+6. `fig7_hub_analysis.png/pdf` - Hub classification (in-degree vs out-degree)
+7. `fig9_top_bridges.png/pdf` - Top 15 evolutionary bridges
+8. `fig10_authority_composition.png/pdf` - Internal vs external influence
+9. `fig11_macro_community_flow.png/pdf` - Macroscopic inter-community flow
 
 **Auxiliary Files**:
 - `table_top10_comparison.tex` - LaTeX table for report
@@ -200,7 +199,7 @@ An interactive D3.js visualization has been generated to explore the music sampl
 
 **Label Propagation Algorithm (LPA)**:
 - Unsupervised community detection (no genre metadata)
-- Detected 13,971 distinct clusters
+- Detected 13,855 distinct clusters
 - Identifies musical "genealogical families"
 
 ### 3. Top 15 Network Clarity
@@ -240,8 +239,8 @@ The `fig1_top15_sampling_network` visualization has been refined to show only **
 - **Mean Out-Degree**: 6.04
 
 ### Community Detection
-- **Total Clusters**: 13,971
-- **Modularity**: 0.1926
+- **Total Clusters**: 13,855
+- **Intra-Cluster Edge Fraction**: 0.1926 (simplified modularity)
 - **Largest Cluster**: 675 songs
 - **Mean Cluster Size**: 1.69
 

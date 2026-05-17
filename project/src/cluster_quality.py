@@ -115,17 +115,18 @@ print(f"  Intra-cluster edges (within clusters): {intra_cluster_edges:,} ({100*i
 print(f"  Inter-cluster edges (between clusters): {inter_cluster_edges:,} ({100*inter_cluster_edges/total_edges:.1f}%)")
 print(f"  Edges with unclustered nodes: {unclustered_edges:,} ({100*unclustered_edges/total_edges:.1f}%)")
 
-simple_modularity = intra_cluster_edges / total_edges
-print(f"\nSimplified Modularity Score: {simple_modularity:.4f}")
+intra_cluster_edge_fraction = intra_cluster_edges / total_edges
+print(f"\nIntra-Cluster Edge Fraction (Simplified Modularity): {intra_cluster_edge_fraction:.4f}")
+print(f"(Proportion of edges that fall within the same community)")
 
-if simple_modularity > 0.5:
+if intra_cluster_edge_fraction > 0.5:
     print("✓ EXCELLENT: Very strong community structure!")
-elif simple_modularity > 0.3:
+elif intra_cluster_edge_fraction > 0.3:
     print("✓ GOOD: Clear community structure detected")
-elif simple_modularity > 0.15:
+elif intra_cluster_edge_fraction > 0.15:
     print("⚠ MODERATE: Some community structure present")
 else:
-    print("✗ WEAK: Poor cluster separation")
+    print("✗ WEAK: Low intra-cluster connectivity")
 
 # Cluster cohesion
 print("\n🔗 CLUSTER COHESION ANALYSIS")
@@ -209,7 +210,7 @@ quality_summary = spark.createDataFrame([
     ("num_clusters", float(size_stats['num_clusters'])),
     ("avg_cluster_size", float(size_stats['avg_size'])),
     ("max_cluster_size", float(size_stats['max_size'])),
-    ("simple_modularity", float(simple_modularity)),
+    ("intra_cluster_edge_fraction", float(intra_cluster_edge_fraction)),
     ("intra_cluster_edges", float(intra_cluster_edges)),
     ("inter_cluster_edges", float(inter_cluster_edges)),
     ("unclustered_edges", float(unclustered_edges))
