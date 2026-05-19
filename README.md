@@ -17,8 +17,6 @@ This project analyzes the **genealogy of music** through sampling relationships,
 - **James Brown** is the #2 authority (PageRank: 45.43, 204 samples) - the classic "Godfather of Soul"
 - **13,855 musical communities** detected (intra-cluster edge fraction: 0.1926)
 - **Power-law concentration**: Top 1% of artists control 23.6% of all sampling events
-- Full support for **CJK (Chinese/Japanese/Korean) Unicode characters** in artist names and visualizations
-
 ---
 
 ## 📁 Project Structure
