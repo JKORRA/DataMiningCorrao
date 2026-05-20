@@ -13,6 +13,9 @@ import numpy as np
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, count
 
+plt.rcParams["font.sans-serif"] = ["DejaVu Sans", "Droid Sans Fallback", "IPAGothic", "IPAMincho", "sans-serif"]
+plt.rcParams["axes.unicode_minus"] = False
+
 spark = SparkSession.builder \
     .appName("MusicGenealogy_FinalViz") \
     .config("spark.driver.memory", "4g") \
@@ -49,7 +52,7 @@ top_edges = df_graph.filter(
 # Get cluster info for coloring
 viz_data = top_edges.join(
     df_labels.select(col("artist_name"), col("cluster_id"), col("cluster_representative")),
-    top_edges.Original_Artist_Name == df_labels.cluster_representative,
+    top_edges.Original_Artist_Name == df_labels.artist_name,
     "left"
 ).select(
     col("Sampler_Artist_Name"),
@@ -89,7 +92,7 @@ if len(G.nodes) == 0:
 # Assign colors based on clusters
 unique_clusters = sorted(list(set(nx.get_node_attributes(G, 'cluster').values())))
 # Use a perceptually distinct colormap
-cmap = cm.get_cmap("Set2", max(len(unique_clusters), 8))
+cmap = plt.colormaps["Set2"].resampled(max(len(unique_clusters), 8))
 cluster_color_map = {cid: cmap(i) for i, cid in enumerate(unique_clusters)}
 
 node_colors = []

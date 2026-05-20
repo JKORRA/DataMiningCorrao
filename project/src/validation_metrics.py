@@ -168,10 +168,34 @@ duplicate_edges = df_graph.groupBy("source_song_id", "target_song_id") \
     .count()
 print(f"Duplicate edges: {duplicate_edges}")
 
-# Save summary
-print("\n💾 SAVING VALIDATION REPORT")
+# Missing but important network metrics
+print("\n🌐 NETWORK CONNECTIVITY")
 print("-" * 70)
 
+# Reciprocity: fraction of edges that are bidirectional
+# Count edges where A->B and B->A both exist
+edges_ab = df_graph.select(
+    col("Sampler_Artist_Name").alias("a"),
+    col("Original_Artist_Name").alias("b")
+).distinct()
+
+edges_ba = edges_ab.withColumnRenamed("a", "b_tmp").withColumnRenamed("b", "a_tmp") \
+    .select(col("a_tmp").alias("a"), col("b_tmp").alias("b"))
+
+reciprocal_count = edges_ab.join(edges_ba, ["a", "b"], "inner").count()
+total_directed_pairs = edges_ab.count()
+reciprocity = reciprocal_count / total_directed_pairs if total_directed_pairs > 0 else 0.0
+print(f"Reciprocal Edges (A→B AND B→A): {reciprocal_count:,}")
+print(f"Total Directed Pairs: {total_directed_pairs:,}")
+print(f"Reciprocity: {reciprocity:.6f}")
+
+print("\n✅ Missing network metrics note: WCC, SCC, clustering coefficient,")
+print("   and assortativity require iterative BFS/connected components")
+print("   which are computationally expensive. For a complete academic")
+print("   evaluation, consider implementing these with GraphFrames or")
+print("   NetworkX on the collapsed artist graph.")
+
+# Add these to the saved summary
 summary_data = [
     ("total_edges", float(total_edges)),
     ("total_songs", float(total_songs)),
@@ -187,6 +211,14 @@ summary_data = [
     ("self_loops", float(self_loops)),
     ("duplicate_edges", float(duplicate_edges))
 ]
+
+summary_data.append(("reciprocal_edge_pairs", float(reciprocal_count)))
+summary_data.append(("total_directed_pairs", float(total_directed_pairs)))
+summary_data.append(("reciprocity", float(reciprocity)))
+
+# Save summary
+print("\n💾 SAVING VALIDATION REPORT")
+print("-" * 70)
 
 summary_df = spark.createDataFrame(summary_data, ["metric", "value"])
 summary_df.write.mode("overwrite").csv("outputs/validation_summary.csv", header=True)

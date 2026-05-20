@@ -30,8 +30,8 @@ edges = df_graph.filter(
 
 edges = (
     edges.groupBy(
-        col("Original_Artist_Name").alias("source"),
-        col("Sampler_Artist_Name").alias("target"),
+        col("Sampler_Artist_Name").alias("source"),
+        col("Original_Artist_Name").alias("target"),
     )
     .sum("weight")
     .withColumnRenamed("sum(weight)", "weight")
@@ -436,4 +436,4 @@ with open("outputs/interactive_genealogy.html", "w", encoding="utf-8") as f:
     f.write(html_content)
 
 print(f"✓ Interactive network saved to outputs/interactive_genealogy.html")
-print(f"  Nodes: {{len(nodes)}}, Links: {{len(links)}}")
+print(f"  Nodes: {len(nodes)}, Links: {len(links)}")

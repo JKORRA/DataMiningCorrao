@@ -8,7 +8,8 @@ from pyspark.sql.functions import col, count, desc, expr, sum as _sum, avg, stdd
 import pandas as pd
 import matplotlib.pyplot as plt
 
-plt.rcParams["font.sans-serif"] = ["DejaVu Sans", "Droid Sans Fallback", "sans-serif"]
+plt.rcParams["font.sans-serif"] = ["DejaVu Sans", "Droid Sans Fallback", "IPAGothic", "IPAMincho", "sans-serif"]
+plt.rcParams["axes.unicode_minus"] = False
 import matplotlib.patches as mpatches
 import numpy as np
 import os
@@ -20,7 +21,7 @@ plt.rcParams["font.size"] = 10
 # Removed forced serif to allow fallback fonts
 # plt.rcParams["font.family"] = "serif"
 
-os.makedirs("report_figures", exist_ok=True)
+os.makedirs("figures/report_figures", exist_ok=True)
 
 print("=" * 80)
 print("GENERATING REPORT FIGURES AND STATISTICS")
@@ -431,5 +432,16 @@ print("  • fig4_cluster_distribution.png/pdf - Cluster size analysis")
 print("  • fig7_powerlaw_analysis.png/pdf - Cumulative distribution")
 print("  • table_top10_comparison.tex - LaTeX table")
 print("  • statistics_summary.txt - Text summary for report")
+
+# Copy generated figures to report/Immagini/ for LaTeX compilation
+import shutil
+report_img_dir = "../report/Immagini"
+if os.path.exists(report_img_dir):
+    for fname in os.listdir("figures/report_figures"):
+        src = os.path.join("figures/report_figures", fname)
+        dst = os.path.join(report_img_dir, fname)
+        if os.path.isfile(src):
+            shutil.copy2(src, dst)
+            print(f"   ✓ Copied {fname} to {report_img_dir}/")
 
 spark.stop()

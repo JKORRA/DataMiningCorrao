@@ -8,16 +8,17 @@ This directory contains all the source code, data processing scripts, and analys
 
 ```
 project/
-├── src/                    # Core analysis scripts (9 files)
-│   ├── data_preparation.py
-│   ├── top_ranking.py
-│   ├── compute_authority_manual.py
+├── src/                    # Core analysis scripts (10 files)
+│   ├── advanced_experiments.py
 │   ├── cluster.py
-│   ├── validation_metrics.py
 │   ├── cluster_quality.py
+│   ├── compute_authority_manual.py
+│   ├── data_preparation.py
 │   ├── external_validation.py
+│   ├── genealogy_visualizations.py
 │   ├── generate_report_figures.py
-│   └── genealogy_visualizations.py
+│   ├── top_ranking.py
+│   └── validation_metrics.py
 │
 ├── utils/                  # Utility scripts (3 files)
 │   ├── analyze_selfloops.py
@@ -42,7 +43,7 @@ project/
 ├── checkpoints/            # Spark checkpoints (generated)
 ├── checkpoints_clustering/ # Clustering checkpoints (generated)
 │
-├── venv/                   # Python virtual environment
+├── .venv/                   # Python virtual environment
 │
 ├── run_pipeline.sh         # Main execution script
 └── requirements.txt        # Python dependencies
@@ -54,7 +55,7 @@ project/
 
 ```bash
 # Activate virtual environment
-source venv/bin/activate
+source .venv/bin/activate
 
 # Run complete pipeline
 ./run_pipeline.sh
@@ -88,10 +89,10 @@ python3 src/compute_authority_manual.py
   - Convergence criterion (tolerance: 0.0001)
   - Output: `outputs/artist_pagerank.parquet/`
   
-- **cluster.py** (4,664 bytes)
-  - Custom Label Propagation Algorithm
-  - 6 iterations to detect musical communities
-  - Output: `outputs/music_labels.parquet/`, `outputs/music_clusters.csv/`
+- **cluster.py**
+  - Louvain community detection via NetworkX (resolution r=1.0)
+  - Constructs weighted undirected graph from directed sampling edges
+  - Output: `outputs/music_clusters.csv`, `outputs/music_cluster_membership.csv`
 
 ### Validation & Quality
 - **validation_metrics.py** (8,723 bytes)
@@ -140,10 +141,11 @@ All analysis results are stored in `outputs/`:
 
 | File | Size | Description |
 |------|------|-------------|
-| music_graph.parquet/ | ~15MB | Cleaned graph (58,621 song-level edges, 68,527 nodes, 23,503 unique artists) |
+| music_graph.parquet/ | ~15MB | Cleaned graph (57,741 song-level edges, 67,638 nodes, 23,242 unique artists) |
 | artist_pagerank.parquet/ | ~2MB | PageRank scores for all artists |
-| music_labels.parquet/ | ~8MB | Cluster assignments for each song |
-| music_clusters.csv/ | ~250KB | Cluster sizes and members |
+| music_labels.parquet | ~368KB | Community assignments for each song |
+| music_clusters.csv | ~1.5KB | Community statistics (1,774 clusters) |
+| music_cluster_membership.csv | ~2MB | Artist-to-community mapping |
 | validation_summary.csv/ | ~5KB | Network statistics summary |
 | cluster_quality_summary.csv/ | ~3KB | Intra-cluster edge fraction and quality metrics |
 | top_100_artists_pagerank.csv/ | ~8KB | Top 100 artists by authority |
@@ -159,9 +161,8 @@ All analysis results are stored in `outputs/`:
 ### Statistical Plots (`figures/report_figures/`)
 1. **fig2_volume_vs_authority.png/pdf** - Top 20 comparison (in-degree vs PageRank)
 2. **fig4_cluster_distribution.png/pdf** - Cluster size histogram
-3. **fig6_top_artists_comparison.png/pdf** - Top 10 detailed comparison
-4. **fig7_powerlaw_analysis.png/pdf** - Cumulative degree distribution (log-log)
-5. **statistics_summary.txt** - Text statistics
+3. **fig7_powerlaw_analysis.png/pdf** - Cumulative degree distribution (log-log)
+4. **statistics_summary.txt** - Text statistics
 
 ### Network Diagrams (`figures/report_figures/`)
 1. **fig1_top15_sampling_network.png/pdf** - Core sampling relationships among top 15
@@ -219,4 +220,4 @@ All scripts include:
 
 For complete project documentation, see `../README.md` in the parent directory.
 
-**Last Updated**: 12 February 2026
+**Last Updated**: 20 May 2026

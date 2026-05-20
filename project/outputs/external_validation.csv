@@ -1,11 +1,30 @@
 ground_truth,ground_truth_rank,matched_artist,system_rank,authority_score,match_score
-James Brown,1,James Brown,2,45.43545838428819,100
-Public Enemy,2,Public Enemy,56,11.62331819397528,100
-Run-D.M.C.,3,Run‐D.M.C.,34,15.375712966103352,100
-The Winstons,4,The Winstons,27,17.603796901889016,100
-Lyn Collins,5,Lyn Collins,8,27.06120028594773,100
-Kraftwerk,6,Kraftwerk,10,25.898278591228348,100
-Michael Jackson,7,Michael Jackson,13,22.97313227565014,100
-The Beatles,8,The Beatles,49,12.471630785324033,100
-The Notorious B.I.G.,9,The Notorious B.I.G.,52,12.223701214251852,100
-Madonna,10,Madonna,54,11.827668022848362,100
+James Brown,1,James Brown,2,45.66971955334005,100
+Public Enemy,2,Public Enemy,56,11.58441406604894,100
+Run-D.M.C.,3,Run-D.M.C.,34,15.257159364819191,100
+The Winstons,4,The Winstons,26,17.587048539944814,100
+Lyn Collins,5,Lyn Collins,6,27.10029287759599,100
+Kraftwerk,6,Kraftwerk,10,25.986623037632274,100
+Michael Jackson,7,Michael Jackson,14,22.585566716422058,100
+The Beatles,8,The Beatles,48,12.416469713205226,100
+The Notorious B.I.G.,9,The Notorious B.I.G.,51,12.263415118428696,100
+Madonna,10,Madonna,53,11.717742633674845,100
+Queen,11,Queen,46,12.677880880266658,100
+David Bowie,12,David Bowie,234,5.320338590319715,100
+Led Zeppelin,13,Led Zeppelin,106,8.384224104695987,100
+Prince,14,Prince,45,12.734831225780175,100
+Parliament,16,Parliament,81,10.046331785987869,100
+Funkadelic,17,Funkadelic,79,10.198234702072503,100
+Beastie Boys,18,Beastie Boys,41,13.330044592921157,100
+Kool & the Gang,19,Kool and the Gang,27,17.23922125016019,100
+Sly & the Family Stone,20,Sly and the Family Stone,464,3.5270303982802442,100
+Marvin Gaye,21,Marvin Gaye,77,10.22662213956564,100
+Stevie Wonder,22,Stevie Wonder,133,7.276574589604879,100
+Isaac Hayes,23,Isaac Hayes,20,18.63328146787751,100
+Curtis Mayfield,24,Curtis Mayfield,65,10.96979234592647,100
+The Isley Brothers,25,The Isley Brothers,111,8.102306931165252,100
+The Temptations,26,The Temptations,352,4.277433120921222,100
+The Supremes,27,The Supremes,124,7.612471654352495,100
+Aretha Franklin,28,Aretha Franklin,294,4.649019646009234,100
+Ray Charles,29,Ray Charles,643,2.8692019027917306,100
+Elvis Presley,30,Elvis Presley,1747,1.588761079980778,100

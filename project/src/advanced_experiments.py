@@ -21,7 +21,8 @@ plt.rcParams["savefig.dpi"] = 300
 plt.rcParams["font.size"] = 11
 
 # Add CJK fallback font
-plt.rcParams["font.sans-serif"] = ["DejaVu Sans", "Droid Sans Fallback", "sans-serif"]
+plt.rcParams["font.sans-serif"] = ["DejaVu Sans", "Droid Sans Fallback", "IPAGothic", "IPAMincho", "sans-serif"]
+plt.rcParams["axes.unicode_minus"] = False
 
 output_dir = "figures/report_figures"
 os.makedirs(output_dir, exist_ok=True)
@@ -220,8 +221,8 @@ if df_labels is not None:
     for _, row in macro_flow.iterrows():
         G_macro.add_edge(row["sampler_cluster"], row["original_cluster"], weight=row["weight"])
         
-    fig, ax = plt.subplots(figsize=(14, 10))
-    pos = nx.spring_layout(G_macro, k=2, iterations=100, seed=42)
+    fig, ax = plt.subplots(figsize=(16, 12))
+    pos = nx.circular_layout(G_macro)
     
     edges_plot = G_macro.edges()
     weights = [G_macro[u][v]['weight'] for u, v in edges_plot]
@@ -234,13 +235,13 @@ if df_labels is not None:
         alpha=0.6,
         arrows=True,
         arrowsize=20,
-        arrowstyle="->",
-        connectionstyle="arc3,rad=0.2",
+        arrowstyle="-|>",
         ax=ax
     )
     
     in_degrees = dict(G_macro.in_degree(weight='weight'))
-    node_sizes = [in_degrees.get(n, 0) * 30 + 500 for n in G_macro.nodes()]
+    max_in = max([in_degrees.get(n, 0) for n in G_macro.nodes()] + [1])
+    node_sizes = [(in_degrees.get(n, 0) / max_in) * 4000 + 1000 for n in G_macro.nodes()]
     
     nx.draw_networkx_nodes(
         G_macro, pos,
@@ -255,13 +256,17 @@ if df_labels is not None:
         ax.text(x, y, node, fontsize=10, fontweight="bold", ha="center", va="center",
                 bbox=dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="#27ae60", alpha=0.9))
                 
-    for u, v, d in G_macro.edges(data=True):
-        edge_label = f"{d['weight']}"
-        # midpoint
-        x_mid = (pos[u][0] + pos[v][0]) / 2
-        y_mid = (pos[u][1] + pos[v][1]) / 2
-        # offset slightly for curve
-        ax.text(x_mid, y_mid + 0.05, edge_label, fontsize=9, color="#c0392b", fontweight="bold", ha="center")
+    edge_labels = {(u, v): f"{d['weight']}" for u, v, d in G_macro.edges(data=True)}
+    nx.draw_networkx_edge_labels(
+        G_macro, pos,
+        edge_labels=edge_labels,
+        font_color="#c0392b",
+        font_size=9,
+        font_weight="bold",
+        label_pos=0.25, # Labels placed 25% away from source, so reciprocal edges do not overlap
+        bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="none", alpha=0.7),
+        ax=ax
+    )
         
     ax.set_title("Macroscopic Sampling Flow Between Communities\nTop 15 Inter-Community Sampling Pipelines (Edge Label = Total Samples)", fontsize=15, fontweight="bold", pad=20)
     ax.axis("off")
@@ -271,6 +276,17 @@ if df_labels is not None:
     plt.savefig(f"{output_dir}/fig11_macro_community_flow.png", bbox_inches="tight")
     print("  ✓ Saved fig11_macro_community_flow.pdf")
     plt.close()
+
+# Copy generated figures to report/Immagini/ for LaTeX compilation
+import shutil
+report_img_dir = "../report/Immagini"
+if os.path.exists(report_img_dir):
+    for fname in os.listdir("figures/report_figures"):
+        src = os.path.join("figures/report_figures", fname)
+        dst = os.path.join(report_img_dir, fname)
+        if os.path.isfile(src):
+            shutil.copy2(src, dst)
+            print(f"   ✓ Copied {fname} to {report_img_dir}/")
 
 spark.stop()
 print("\n" + "=" * 80)

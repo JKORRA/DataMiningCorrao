@@ -61,11 +61,12 @@ cluster_sizes.select(
     expr("SUM(CASE WHEN cluster_size > 200 THEN 1 ELSE 0 END)").alias("Giant (>200)")
 ).show(truncate=False)
 
-# Modularity calculation
-print("\n🎯 MODULARITY SCORE")
+# Intra-cluster edge fraction (simplified cohesion metric)
+print("\n🎯 INTRA-CLUSTER EDGE FRACTION")
 print("-" * 70)
-print("Modularity measures cluster separation quality.")
-print("Range: [-0.5, 1.0] | Good: >0.3 | Excellent: >0.5")
+print("Measures the proportion of edges that fall within the same community.")
+print("Note: This is NOT Newman-Girvan modularity (no null model term).")
+print("It is a simplified cohesion metric. Range: [0.0, 1.0]")
 
 # Total edges in the graph
 total_edges = df_graph.count()
@@ -116,17 +117,17 @@ print(f"  Inter-cluster edges (between clusters): {inter_cluster_edges:,} ({100*
 print(f"  Edges with unclustered nodes: {unclustered_edges:,} ({100*unclustered_edges/total_edges:.1f}%)")
 
 intra_cluster_edge_fraction = intra_cluster_edges / total_edges
-print(f"\nIntra-Cluster Edge Fraction (Simplified Modularity): {intra_cluster_edge_fraction:.4f}")
+print(f"\nIntra-Cluster Edge Fraction: {intra_cluster_edge_fraction:.4f}")
 print(f"(Proportion of edges that fall within the same community)")
 
 if intra_cluster_edge_fraction > 0.5:
-    print("✓ EXCELLENT: Very strong community structure!")
+    print("→ Most edges are community-internal (tightly clustered)")
 elif intra_cluster_edge_fraction > 0.3:
-    print("✓ GOOD: Clear community structure detected")
+    print("→ Moderate internal clustering")
 elif intra_cluster_edge_fraction > 0.15:
-    print("⚠ MODERATE: Some community structure present")
+    print("→ Some community structure present")
 else:
-    print("✗ WEAK: Low intra-cluster connectivity")
+    print("→ Low intra-cluster connectivity (highly cross-connected)")
 
 # Cluster cohesion
 print("\n🔗 CLUSTER COHESION ANALYSIS")
@@ -140,8 +141,14 @@ print(f"\nAnalyzing top 5 clusters...")
 # Pre-calculate internal edges for all clusters using the joined edges DataFrame
 cluster_internal_edges_df = edges_with_clusters \
     .filter(col("src_cluster_id") == col("tgt_cluster_id")) \
-    .groupBy(col("src_cluster_id").alias("cluster_representative")) \
+    .groupBy("src_cluster_id") \
     .agg(count("*").alias("internal_edges"))
+
+# Join with labels to get cluster_representative (artist name)
+cluster_rep_map = df_labels.select("cluster_id", "cluster_representative").distinct()
+cluster_internal_edges_df = cluster_internal_edges_df \
+    .join(cluster_rep_map, cluster_internal_edges_df.src_cluster_id == cluster_rep_map.cluster_id) \
+    .select(col("cluster_representative"), col("internal_edges"))
 
 # Join internal edges to the top clusters and evaluate density
 for i, row in enumerate(top_clusters, 1):
@@ -206,6 +213,7 @@ bridges_named.show(10, truncate=False)
 print("\n💾 SAVING CLUSTER QUALITY REPORT")
 print("-" * 70)
 
+# Intra-cluster cohesion metrics
 quality_summary = spark.createDataFrame([
     ("num_clusters", float(size_stats['num_clusters'])),
     ("avg_cluster_size", float(size_stats['avg_size'])),

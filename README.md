@@ -9,14 +9,14 @@
 
 ## 📋 Project Overview
 
-This project analyzes the **genealogy of music** through sampling relationships, modeling the music ecosystem as a directed graph where nodes represent songs and edges represent sampling events. Using distributed graph algorithms (PageRank, Label Propagation) implemented from scratch in Apache Spark, we identify structural authorities and musical communities beyond traditional popularity metrics.
+This project analyzes the **genealogy of music** through sampling relationships, modeling the music ecosystem as a directed graph where nodes represent songs and edges represent sampling events. Using PageRank (implemented from scratch in Apache Spark) and Louvain community detection (via NetworkX), we identify structural authorities and musical communities beyond traditional popularity metrics. Automated alias resolution merges 161 artist name variants (e.g., "James Brown & The Famous Flames" → "James Brown").
 
 ### Key Findings
-- **58,621 sampling events** connecting 68,527 songs across 23,503 artists
-- **Daniel Ingram** emerges as the top structural authority (PageRank: 59.38, Anime/Musical theater composer)
-- **James Brown** is the #2 authority (PageRank: 45.43, 204 samples) - the classic "Godfather of Soul"
-- **13,855 musical communities** detected (intra-cluster edge fraction: 0.1926)
-- **Power-law concentration**: Top 1% of artists control 23.6% of all sampling events
+- **57,741 sampling events** connecting 67,638 songs across 23,242 unique artists
+- **Daniel Ingram** emerges as the top structural authority (PageRank: 59.85, Anime/Musical theater composer)
+- **James Brown** is the #2 authority (PageRank: 45.67) - the classic "Godfather of Soul"
+- **1,774 musical communities** detected (intra-cluster edge fraction: 0.7169)
+- **Power-law concentration**: Top 1% of artists control 23.5% of all sampling events
 ---
 
 ## 📁 Project Structure
@@ -26,14 +26,16 @@ DataMiningCorrao/
 ├── README.md                          # This file
 ├── project/                           # Source code and data processing
 │   ├── src/                          # Core analysis scripts
-│   │   ├── data_preparation.py       # Data ingestion and graph construction
-│   │   ├── compute_authority_manual.py # PageRank implementation
-│   │   ├── cluster.py                # Label Propagation clustering
+│   │   ├── advanced_experiments.py   # Bridges, authority context, macro flow
+│   │   ├── cluster.py                # Louvain community detection
 │   │   ├── cluster_quality.py        # Modularity and cluster metrics
-│   │   ├── top_ranking.py            # Degree centrality analysis
-│   │   ├── validation_metrics.py     # Network statistics
+│   │   ├── compute_authority_manual.py # PageRank implementation
+│   │   ├── data_preparation.py       # Data ingestion and graph construction
+│   │   ├── external_validation.py    # Spearman correlation against ground truth
+│   │   ├── genealogy_visualizations.py # Network diagrams
 │   │   ├── generate_report_figures.py # Statistical visualizations
-│   │   └── genealogy_visualizations.py # Network diagrams
+│   │   ├── top_ranking.py            # Degree centrality analysis
+│   │   └── validation_metrics.py     # Network statistics
 │   │
 │   ├── utils/                        # Utility scripts
 │   │   ├── analyze_selfloops.py      # Self-loop detection analysis
@@ -45,7 +47,8 @@ DataMiningCorrao/
 │   ├── outputs/                      # Analysis results (generated)
 │   │   ├── music_graph.parquet       # Processed graph structure
 │   │   ├── artist_pagerank.parquet   # PageRank results
-│   │   ├── music_clusters.csv        # Cluster assignments
+│   │   ├── music_clusters.csv        # Community statistics
+│   │   ├── music_cluster_membership.csv # Artist-to-community mapping
 │   │   ├── music_labels.parquet      # Label propagation results
 │   │   ├── interactive_genealogy.html # D3.js interactive visualization
 │   │   └── cluster_quality_summary.csv
@@ -56,7 +59,7 @@ DataMiningCorrao/
 └── report/                           # Final report and documentation
     ├── DataMining.pdf                # Final compiled report (MAIN DELIVERABLE)
     ├── DataMining.tex                # LaTeX source
-    ├── SPIEGAZIONE_ITALIANA.md       # Italian explanation
+    ├── SpiegazioneFacile.md          # Italian explanation
     └── Immagini/                     # Report figures
 ```
 
@@ -95,34 +98,55 @@ DataMiningCorrao/
 ```
 This executes the full analysis pipeline:
 1. Data preparation and graph construction
-2. PageRank authority calculation
-3. Label Propagation clustering
-4. Cluster quality metrics
-5. Network validation
-6. Figure generation
+2. Descriptive analysis (volume-based rankings)
+3. PageRank authority calculation
+4. Louvain community detection
+5. Graph validation metrics
+6. Cluster quality analysis
+7. Cluster visualization
+8. Report-quality network visualizations
+9. Advanced experiments (bridges, authority context, macro flow)
+10. Report figure generation
+11. External validation against ground truth
+12. Interactive D3.js visualization
 
 **Option 2: Individual Steps**
 ```bash
 # 1. Prepare data and construct graph
 python3 src/data_preparation.py
 
-# 2. Calculate PageRank authority
-python3 src/compute_authority_manual.py
-
-# 3. Detect communities
-python3 src/cluster.py
-
-# 4. Calculate cluster quality
-python3 src/cluster_quality.py
-
-# 5. Analyze degree centrality
+# 2. Analyze degree centrality
 python3 src/top_ranking.py
 
-# 6. Generate statistical figures
+# 3. Calculate PageRank authority
+python3 src/compute_authority_manual.py
+
+# 4. Detect communities
+python3 src/cluster.py
+
+# 5. Calculate graph validation metrics
+python3 src/validation_metrics.py
+
+# 6. Calculate cluster quality
+python3 src/cluster_quality.py
+
+# 7. Visualize clusters
+python3 utils/visualize_cluster.py
+
+# 8. Generate network visualizations
+python3 src/genealogy_visualizations.py
+
+# 9. Run advanced experiments
+python3 src/advanced_experiments.py
+
+# 10. Generate statistical figures
 python3 src/generate_report_figures.py
 
-# 7. Generate network visualizations
-python3 src/genealogy_visualizations.py
+# 11. Run external validation
+python3 src/external_validation.py
+
+# 12. Generate interactive visualization
+python3 utils/generate_interactive_network.py
 ```
 
 ### Expected Runtime
@@ -139,8 +163,9 @@ python3 src/genealogy_visualizations.py
 ### Analysis Results (`project/outputs/`)
 - `music_graph.parquet/` - Cleaned graph (58,621 edges, no self-loops)
 - `artist_pagerank.parquet/` - PageRank scores for all artists
-- `music_clusters.csv/` - Song-to-cluster assignments
-- `music_labels.parquet/` - Label propagation results (13,855 clusters)
+- `music_clusters.csv` - Community statistics (1,774 clusters)
+- `music_cluster_membership.csv` - Artist-to-community mapping
+- `music_labels.parquet` - Per-song community assignments
 - `interactive_genealogy.html` - **D3.js interactive visualization** (see below)
 
 ### Visualizations (`project/figures/report_figures/`)
@@ -149,15 +174,13 @@ python3 src/genealogy_visualizations.py
 1. `fig1_top15_sampling_network.png/pdf` - Top 15 artists inter-connection network
 2. `fig2_volume_vs_authority.png/pdf` - Top 20 comparison (in-degree vs PageRank)
 3. `fig4_cluster_distribution.png/pdf` - Cluster size histogram & top 20
-4. `fig6_top_artists_comparison.png/pdf` - Top 10 detailed comparison
-5. `fig7_powerlaw_analysis.png/pdf` - Cumulative distribution (log-log)
-6. `fig7_hub_analysis.png/pdf` - Hub classification (in-degree vs out-degree)
-7. `fig9_top_bridges.png/pdf` - Top 15 evolutionary bridges
-8. `fig10_authority_composition.png/pdf` - Internal vs external influence
-9. `fig11_macro_community_flow.png/pdf` - Macroscopic inter-community flow
+4. `fig7_powerlaw_analysis.png/pdf` - Cumulative distribution (log-log)
+5. `fig7_hub_analysis.png/pdf` - Hub classification (in-degree vs out-degree)
+6. `fig9_top_bridges.png/pdf` - Top 15 evolutionary bridges
+7. `fig10_authority_composition.png/pdf` - Internal vs external influence
+8. `fig11_macro_community_flow.png/pdf` - Macroscopic inter-community flow
 
 **Auxiliary Files**:
-- `table_top10_comparison.tex` - LaTeX table for report
 - `statistics_summary.txt` - Text statistics summary
 
 ---
@@ -193,12 +216,14 @@ An interactive D3.js visualization has been generated to explore the music sampl
 - Iterative MapReduce with convergence criterion (tolerance: 0.0001)
 - Dangling node handling via right outer join
 - Lineage truncation with checkpointing (prevents StackOverflowError)
-- Converged in ~11 iterations
+- Runs a fixed 50 iterations with convergence criterion
 
-**Label Propagation Algorithm (LPA)**:
-- Unsupervised community detection (no genre metadata)
-- Detected 13,855 distinct clusters
-- Identifies musical "genealogical families"
+**Louvain Community Detection**:
+- Modularity-maximization algorithm (resolution r=1.0)
+- Weighted undirected graph derived from sampling edges
+- Detected 1,774 distinct communities
+- Largest community: JAY-Z (2,196 artists)
+- Intra-cluster edge fraction: 0.7169 (72% of sampling stays within communities)
 
 ### 3. Top 15 Network Clarity
 The `fig1_top15_sampling_network` visualization has been refined to show only **inter-connections** between the top 15 most-sampled artists, removing external clutter nodes for maximum clarity.
@@ -214,7 +239,7 @@ The `fig1_top15_sampling_network` visualization has been refined to show only **
 - **Figures**: 10 publication-quality visualizations (300 DPI)
 
 ### Italian Explanation
-- **File**: `report/SPIEGAZIONE_ITALIANA.md`
+- **File**: `report/SpiegazioneFacile.md`
 - **Purpose**: Detailed Italian commentary on findings
 
 ---
@@ -222,25 +247,25 @@ The `fig1_top15_sampling_network` visualization has been refined to show only **
 ## 🎯 Key Results Summary
 
 ### Authority Rankings (PageRank)
-1. **Daniel Ingram** - 59.38 (Musical theater / Anime composer)
-2. **James Brown** - 45.43 (The Godfather of Soul)
-3. **2Pac** - 44.81
-4. **電音部 (Den-On-Bu)** - 38.52 (Japanese multimedia project)
-5. **外神田文芸高校** - 33.77 (Japanese creative group)
+1. **Daniel Ingram** - 59.85 (Musical theater / Anime composer)
+2. **James Brown** - 45.67 (The Godfather of Soul)
+3. **2Pac** - 45.01
+4. **電音部 (Den-On-Bu)** - 40.90 (Japanese multimedia project)
+5. **外神田文芸高校** - 35.61 (Japanese creative group)
 
 ### Network Properties
-- **Nodes**: 68,527 songs (23,503 unique artists)
-- **Edges**: 58,621 sampling events
+- **Nodes**: 67,638 songs (23,242 unique artists)
+- **Edges**: 57,741 sampling events
 - **Graph Type**: Directed, scale-free
-- **Density**: 0.00001248 (sparse)
+- **Density**: 0.00001262 (sparse)
 - **Mean In-Degree**: 3.52
-- **Mean Out-Degree**: 6.04
+- **Mean Out-Degree**: 5.97
 
 ### Community Detection
-- **Total Clusters**: 13,855
-- **Intra-Cluster Edge Fraction**: 0.1926 (simplified modularity)
-- **Largest Cluster**: 675 songs
-- **Mean Cluster Size**: 1.69
+- **Total Communities**: 1,774
+- **Intra-Cluster Edge Fraction**: 0.7169
+- **Largest Community**: JAY-Z (2,196 artists)
+- **Mean Community Size**: 13.07
 
 ---
 
@@ -286,4 +311,4 @@ The `fig1_top15_sampling_network` visualization has been refined to show only **
 
 ---
 
-**Last Updated**: 5 May 2026
+**Last Updated**: 20 May 2026

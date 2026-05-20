@@ -8,7 +8,8 @@ import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
 
-plt.rcParams["font.sans-serif"] = ["DejaVu Sans", "Droid Sans Fallback", "sans-serif"]
+plt.rcParams["font.sans-serif"] = ["DejaVu Sans", "Droid Sans Fallback", "IPAGothic", "IPAMincho", "sans-serif"]
+plt.rcParams["axes.unicode_minus"] = False
 import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 import numpy as np
@@ -273,37 +274,31 @@ ax.scatter(
     label="Top 15 Most Sampled"
 )
 
-from adjustText import adjust_text
-
 # Only label the top 7 to avoid extreme clutter while retaining the 15 red dots
 labels_to_show = top_15_vol[:7]
 
-texts = []
-for _, row in top_df.iterrows():
-    if row["artist"] not in labels_to_show:
-        continue
-    label = row["artist"] if len(row["artist"]) <= 18 else row["artist"][:16] + "..."
-    texts.append(
-        ax.text(
-            row["out_degree_log"],
-            row["in_degree_log"],
-            label,
-            fontsize=10,
-            fontweight="bold",
-            bbox=dict(
-                boxstyle="round,pad=0.3",
-                facecolor="#FFFACD",
-                edgecolor="#E74C3C",
-                alpha=0.9,
-            )
-        )
-    )
+top_7_sorted = top_df[top_df["artist"].isin(labels_to_show)].sort_values(by="in_degree_log", ascending=False)
+y_vals = np.logspace(np.log10(120), np.log10(320), num=len(top_7_sorted))[::-1]
 
-adjust_text(
-    texts,
-    arrowprops=dict(arrowstyle="->", color="#E74C3C", lw=1.5),
-    expand_points=(1.5, 1.5)
-)
+for idx, (_, row) in enumerate(top_7_sorted.iterrows()):
+    label = row["artist"] if len(row["artist"]) <= 18 else row["artist"][:16] + "..."
+    ax.annotate(
+        label,
+        xy=(row["out_degree_log"], row["in_degree_log"]),
+        xytext=(350, y_vals[idx]),
+        textcoords="data",
+        fontsize=10,
+        fontweight="bold",
+        ha="left",
+        va="center",
+        bbox=dict(
+            boxstyle="round,pad=0.3",
+            facecolor="#FFFACD",
+            edgecolor="#E74C3C",
+            alpha=0.9,
+        ),
+        arrowprops=dict(arrowstyle="-|>", color="#E74C3C", lw=1.0, alpha=0.7, shrinkB=0)
+    )
 
 median_in = degree_df["in_degree_log"].median()
 median_out = degree_df["out_degree_log"].median()
@@ -312,8 +307,8 @@ ax.axvline(x=median_out, color="gray", linestyle="--", alpha=0.5, linewidth=1.5)
 
 # Anchor quadrant labels to axes relative coordinates so they never overlap
 ax.text(
-    0.95,
-    0.95,
+    0.99,
+    0.98,
     "BRIDGES\n(Sample & Get Sampled)",
     transform=ax.transAxes,
     ha="right",
@@ -371,13 +366,24 @@ cbar = plt.colorbar(sc, ax=ax)
 cbar.set_label("Authority Score (PageRank)", fontsize=11, fontweight="bold")
 
 ax.grid(True, alpha=0.3, linestyle=":", linewidth=1)
-ax.legend(loc="lower left", fontsize=11, framealpha=0.95)
+ax.legend(loc="lower center", bbox_to_anchor=(0.5, -0.15), ncol=2, fontsize=11, framealpha=0.95)
 
 plt.tight_layout()
 plt.savefig(f"{output_dir}/fig7_hub_analysis.png", dpi=300, bbox_inches="tight")
 plt.savefig(f"{output_dir}/fig7_hub_analysis.pdf", bbox_inches="tight")
 print(f"✓ Saved: fig7_hub_analysis.png/pdf\n")
 plt.close()
+
+# Copy generated figures to report/Immagini/ for LaTeX compilation
+import shutil
+report_img_dir = "../report/Immagini"
+if os.path.exists(report_img_dir):
+    for fname in os.listdir("figures/report_figures"):
+        src = os.path.join("figures/report_figures", fname)
+        dst = os.path.join(report_img_dir, fname)
+        if os.path.isfile(src):
+            shutil.copy2(src, dst)
+            print(f"   ✓ Copied {fname} to {report_img_dir}/")
 
 spark.stop()
 print("=" * 80)

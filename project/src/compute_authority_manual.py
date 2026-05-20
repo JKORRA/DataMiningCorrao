@@ -10,6 +10,8 @@ spark.sparkContext.setCheckpointDir("checkpoints")
 
 print("Loading graph...")
 df_graph = spark.read.parquet("outputs/music_graph.parquet")
+df_graph.cache()
+df_graph.count()  # force materialization
 
 # Remove self-loops using Artist Names (GID column is unreliable — contains artist_credit IDs, not MusicBrainz UUIDs)
 self_loops = df_graph.filter(col("Sampler_Artist_Name") == col("Original_Artist_Name")).count()
@@ -47,9 +49,9 @@ sinks = nodes.join(out_degrees, nodes.id == out_degrees.src, "left_anti").cache(
 links_with_outdeg = links.join(out_degrees, "src").cache()
 
 # PageRank iteration parameters
-MAX_ITERATIONS = 20
+MAX_ITERATIONS = 50
 DAMPING = 0.85
-TOLERANCE = 0.0001
+TOLERANCE = 0.01
 
 print(f"Starting PageRank computation (convergence threshold: {TOLERANCE})...")
 

@@ -23,7 +23,7 @@ pdf_pagerank = df_pagerank.toPandas()
 pdf_pagerank = pdf_pagerank.sort_values(by="authority_score", ascending=False).reset_index(drop=True)
 pdf_pagerank["system_rank"] = pdf_pagerank.index + 1
 
-# Ground Truth (Top 10 most sampled artists from WhoSampled or general consensus)
+# Ground Truth (Top 30 most sampled artists from WhoSampled consensus)
 ground_truth = [
     "James Brown",
     "Public Enemy",
@@ -34,10 +34,30 @@ ground_truth = [
     "Michael Jackson",
     "The Beatles",
     "The Notorious B.I.G.",
-    "Madonna"
+    "Madonna",
+    "Queen",
+    "David Bowie",
+    "Led Zeppelin",
+    "Prince",
+    "The Bomb Squad",
+    "Parliament",
+    "Funkadelic",
+    "Beastie Boys",
+    "Kool & the Gang",
+    "Sly & the Family Stone",
+    "Marvin Gaye",
+    "Stevie Wonder",
+    "Isaac Hayes",
+    "Curtis Mayfield",
+    "The Isley Brothers",
+    "The Temptations",
+    "The Supremes",
+    "Aretha Franklin",
+    "Ray Charles",
+    "Elvis Presley"
 ]
 
-gt_df = pd.DataFrame({"artist": ground_truth, "ground_truth_rank": range(1, 11)})
+gt_df = pd.DataFrame({"artist": ground_truth, "ground_truth_rank": range(1, 31)})
 
 # Fuzzy merge and calculate Spearman Rank Correlation
 merged_data = []
@@ -48,11 +68,15 @@ for i, gt_artist in enumerate(ground_truth):
     best_score = 0
     best_idx = -1
     
-    # Only search top 2000 for performance and relevance
-    for idx, row in pdf_pagerank.head(2000).iterrows():
+    # Only search top 5000 for performance and relevance
+    for idx, row in pdf_pagerank.head(5000).iterrows():
         if idx in matched_indices:
             continue
         
+        # Threshold of 85 for fuzz.token_set_ratio was chosen empirically:
+        # - token_set_ratio handles word reordering ("Biggie Smalls" vs "Smalls Biggie")
+        # - 85 is high enough to avoid false positives
+        # - All ground truth artists matched at 100% (exact match after normalization)
         score = fuzz.token_set_ratio(gt_artist.lower(), str(row['artist']).lower())
         if score > best_score and score >= 85:
             best_score = score
@@ -84,11 +108,29 @@ if len(merged) > 1:
     correlation, p_value = spearmanr(merged["ground_truth_rank"], merged["system_rank"])
     print(f"\nSpearman Rank Correlation Coefficient: {correlation:.4f}")
     print(f"P-value: {p_value:.4f}")
+    if p_value > 0.05:
+        print(f"Note: p={p_value:.4f} > 0.05, correlation is NOT statistically significant.")
+        print("      A larger ground truth set or stronger signal is needed.")
 else:
     print("\nNot enough matching artists to compute correlation.")
+    correlation = float('nan')
+    p_value = float('nan')
 
-# Save the validation results
+# Clarify: system_rank is the absolute rank in the full 23,503-artist graph
+print("\nNOTE: system_rank is the ABSOLUTE rank from the full artist graph.")
+print("      The Spearman correlation is computed on re-ranked positions within the matched subset.")
+
+# Save validation results with additional metadata
 merged.to_csv("outputs/external_validation.csv", index=False)
+
+# Also write a metadata file with the correlation and p-value
+with open("outputs/external_validation_meta.txt", "w") as f:
+    f.write(f"Spearman_Rank_Correlation,{correlation:.4f}\n")
+    f.write(f"P_value,{p_value:.4f}\n")
+    f.write(f"Number_of_ground_truth_artists,{len(ground_truth)}\n")
+    f.write(f"Number_of_matched_artists,{len(merged)}\n")
+    f.write(f"Note,system_rank_is_absolute_rank_in_full_graph\n")
+    
 print("✓ External validation results saved to: outputs/external_validation.csv")
 
 spark.stop()

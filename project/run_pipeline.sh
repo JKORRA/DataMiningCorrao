@@ -64,7 +64,7 @@ echo "Starting at: $(date)"
 # =============================================================================
 # STEP 1: DATA PREPARATION
 # =============================================================================
-print_step "STEP 1/10: Data Preparation (Building Graph from MusicBrainz)"
+print_step "STEP 1/12: Data Preparation (Building Graph from MusicBrainz)"
 
 if [ -f "outputs/music_graph.parquet/_SUCCESS" ]; then
     print_warning "outputs/music_graph.parquet already exists. Skipping data preparation."
@@ -82,7 +82,7 @@ fi
 # =============================================================================
 # STEP 2: DESCRIPTIVE ANALYSIS
 # =============================================================================
-print_step "STEP 2/10: Descriptive Analysis (Volume-based Rankings)"
+print_step "STEP 2/12: Descriptive Analysis (Volume-based Rankings)"
 
 python3 src/top_ranking.py
 if [ $? -eq 0 ]; then
@@ -95,7 +95,7 @@ fi
 # =============================================================================
 # STEP 3: PAGERANK AUTHORITY
 # =============================================================================
-print_step "STEP 3/10: PageRank Authority Calculation (WITH FIXES)"
+print_step "STEP 3/12: PageRank Authority Calculation (WITH FIXES)"
 
 python3 src/compute_authority_manual.py
 if [ $? -eq 0 ]; then
@@ -108,7 +108,7 @@ fi
 # =============================================================================
 # STEP 4: CLUSTERING
 # =============================================================================
-print_step "STEP 4/10: Label Propagation Clustering"
+print_step "STEP 4/12: Label Propagation Clustering"
 
 python3 src/cluster.py
 if [ $? -eq 0 ]; then
@@ -121,7 +121,7 @@ fi
 # =============================================================================
 # STEP 5: VALIDATION METRICS
 # =============================================================================
-print_step "STEP 5/10: Graph Validation Metrics (NEW)"
+print_step "STEP 5/12: Graph Validation Metrics (NEW)"
 
 python3 src/validation_metrics.py
 if [ $? -eq 0 ]; then
@@ -134,7 +134,7 @@ fi
 # =============================================================================
 # STEP 6: CLUSTER QUALITY
 # =============================================================================
-print_step "STEP 6/10: Cluster Quality Analysis (NEW)"
+print_step "STEP 6/12: Cluster Quality Analysis (NEW)"
 
 python3 src/cluster_quality.py
 if [ $? -eq 0 ]; then
@@ -147,7 +147,7 @@ fi
 # =============================================================================
 # STEP 7: VISUALIZATION
 # =============================================================================
-print_step "STEP 7/10: Network Visualization (IMPROVED)"
+print_step "STEP 7/12: Network Visualization (IMPROVED)"
 
 python3 utils/visualize_cluster.py
 if [ $? -eq 0 ]; then
@@ -158,9 +158,35 @@ else
 fi
 
 # =============================================================================
-# STEP 8: REPORT FIGURES
+# STEP 7.5: GENEALOGY VISUALIZATIONS
 # =============================================================================
-print_step "STEP 8/10: Generate Report Figures (Publication Quality)"
+print_step "STEP 7.5/12: Report-Quality Network Visualizations"
+
+python3 src/genealogy_visualizations.py
+if [ $? -eq 0 ]; then
+    print_success "Genealogy visualizations generated → figures/"
+else
+    print_error "Genealogy visualizations failed!"
+    exit 1
+fi
+
+# =============================================================================
+# STEP 8: ADVANCED EXPERIMENTS
+# =============================================================================
+print_step "STEP 8/12: Advanced Experiments (Bridges, Authority, Macro Flow)"
+
+python3 src/advanced_experiments.py
+if [ $? -eq 0 ]; then
+    print_success "Advanced experiments completed → figures/"
+else
+    print_error "Advanced experiments failed!"
+    exit 1
+fi
+
+# =============================================================================
+# STEP 9: REPORT FIGURES
+# =============================================================================
+print_step "STEP 9/12: Generate Report Figures (Publication Quality)"
 
 python3 src/generate_report_figures.py
 if [ $? -eq 0 ]; then
@@ -171,9 +197,9 @@ else
 fi
 
 # =============================================================================
-# STEP 9: EXTERNAL VALIDATION
+# STEP 10: EXTERNAL VALIDATION
 # =============================================================================
-print_step "STEP 9/10: External Validation against Ground Truth"
+print_step "STEP 10/12: External Validation against Ground Truth"
 
 python3 src/external_validation.py
 if [ $? -eq 0 ]; then
@@ -184,9 +210,9 @@ else
 fi
 
 # =============================================================================
-# STEP 10: INTERACTIVE VISUALIZATION
+# STEP 11: INTERACTIVE VISUALIZATION
 # =============================================================================
-print_step "STEP 10/10: Generate Interactive Network (D3.js)"
+print_step "STEP 11/12: Generate Interactive Network (D3.js)"
 
 python3 utils/generate_interactive_network.py
 if [ $? -eq 0 ]; then

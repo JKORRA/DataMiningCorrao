@@ -1,0 +1,5 @@
+Spearman_Rank_Correlation,0.7212
+P_value,0.0000
+Number_of_ground_truth_artists,30
+Number_of_matched_artists,29
+Note,system_rank_is_absolute_rank_in_full_graph

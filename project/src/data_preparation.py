@@ -1,6 +1,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType
-from pyspark.sql.functions import col, broadcast, when, regexp_replace
+from pyspark.sql.functions import col, broadcast, when, regexp_replace, trim
+import json, os
 spark = SparkSession.builder \
     .appName("MusicGenealogy_GraphBuilder") \
     .config("spark.driver.memory", "8g") \
@@ -107,7 +108,7 @@ df_acn = load_mb_table("artist_credit_name", artist_credit_name_schema).select("
 df_artist_credit = df_acn.filter(col("position") == 0) \
     .join(df_artist, df_acn.artist == df_artist.artist_id) \
     .select(col("artist_credit").alias("id"), col("name"), col("gid")) \
-    .withColumn("name", regexp_replace(col("name"), "(?i)\\s+(&|feat\\.?|ft\\.?|with|and)\\s+.*", ""))
+    .withColumn("name", regexp_replace(col("name"), "(?i)\\s+(feat\\.?|ft\\.?)\\s+.*", ""))
 
 df_link = load_mb_table("link", link_schema).select("id", "link_type")
 df_l_rec_rec = load_mb_table("l_recording_recording", l_rec_rec_schema).select("link", "entity0", "entity1")
@@ -134,6 +135,47 @@ sampling_edges = df_l_rec_rec.join(df_link, df_l_rec_rec.link == df_link.id) \
     .filter(col("link_type").isin(TARGET_LINK_TYPES)) \
     .withColumn("weight", when(col("link_type").isin([69, 231]), 1.0).otherwise(0.5)) \
     .select(col("entity0").alias("source_song_id"), col("entity1").alias("target_song_id"), col("weight"))
+
+# ---------------------------------------------------------------------------
+# Apply alias mapping THEN mechanical name normalization
+# Order matters: alias keys use original (un-normalized) names, so aliases
+# must be resolved before normalization transforms the strings.
+# Both MUST run BEFORE building the graph edges below.
+# ---------------------------------------------------------------------------
+
+# Step 1 — Alias mapping (variant → canonical) on original names
+ALIAS_PATH = "data/artist_aliases.json"
+if os.path.exists(ALIAS_PATH):
+    with open(ALIAS_PATH) as f:
+        alias_dict = json.load(f)
+    if alias_dict:
+        alias_df = spark.createDataFrame(
+            [(k, v) for k, v in alias_dict.items()],
+            ["variant", "canonical"]
+        )
+        df_artist_credit = df_artist_credit.alias("a").join(
+            broadcast(alias_df).alias("m"),
+            col("a.name") == col("m.variant"), "left_outer"
+        ).select(
+            col("a.id"),
+            when(col("m.canonical").isNull(), col("a.name")).otherwise(col("m.canonical")).alias("name"),
+            col("a.gid")
+        )
+
+# Step 2 — Mechanical normalization on (possibly aliased) names
+normalization_steps = [
+    ("(?i)\\s+&\\s+", " and "),
+    ("[\\u2010-\\u2015\\u2212]", "-"),
+    ("[\\u2018-\\u201B\\u2032\\u2035]", "'"),
+    ("\\s*\\([^)]*\\)\\s*$", ""),
+    ("^(.+),\\s+(The)\\s*$", "$2 $1"),
+    ("\\s+", " "),
+]
+for pattern, replacement in normalization_steps:
+    df_artist_credit = df_artist_credit.withColumn(
+        "name", regexp_replace(col("name"), pattern, replacement)
+    )
+df_artist_credit = df_artist_credit.withColumn("name", trim(col("name")))
 
 # Enrich edges with song and artist information
 print("Enriching graph with artist and song names...")
@@ -171,6 +213,13 @@ df_final_graph = df_source_info.join(df_recording.alias("tgt_rec"), df_source_in
 edges_before = df_final_graph.count()
 print(f"Total edges before self-loop and unknown removal: {edges_before}")
 df_final_graph = df_final_graph.filter((col("Sampler_Artist_GID") != col("Original_Artist_GID")) & (col("Sampler_Artist_Name") != "[unknown]") & (col("Original_Artist_Name") != "[unknown]"))
+
+# Additional filter: remove any edge referencing [unknown] or [no artist]
+df_final_graph = df_final_graph.filter(
+    ~col("Sampler_Artist_Name").rlike("\\[unknown\\]|\\[no artist\\]") &
+    ~col("Original_Artist_Name").rlike("\\[unknown\\]|\\[no artist\\]")
+)
+
 edges_after = df_final_graph.count()
 print(f"Edges after removing self-loops: {edges_after}")
 print(f"Self-loops removed: {edges_before - edges_after} edges")
