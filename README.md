@@ -103,10 +103,10 @@ This executes the full analysis pipeline:
 4. Louvain community detection
 5. Graph validation metrics
 6. Cluster quality analysis
-7. Cluster visualization
-8. Report-quality network visualizations
-9. Advanced experiments (bridges, authority context, macro flow)
-10. Report figure generation
+7. Cluster-colored artist network (Fig 4)
+8. Report-quality hub + bridges visualization (Fig 2)
+9. Authority context analysis (Fig 3)
+10. Report figure generation (Fig 1 + Fig 5)
 11. External validation against ground truth
 12. Interactive D3.js visualization
 
@@ -171,14 +171,11 @@ python3 utils/generate_interactive_network.py
 ### Visualizations (`project/figures/report_figures/`)
 
 **Figures**:
-1. `fig1_top15_sampling_network.png/pdf` - Top 15 artists inter-connection network
-2. `fig2_volume_vs_authority.png/pdf` - Top 20 comparison (in-degree vs PageRank)
-3. `fig4_cluster_distribution.png/pdf` - Cluster size histogram & top 20
-4. `fig7_powerlaw_analysis.png/pdf` - Cumulative distribution (log-log)
-5. `fig7_hub_analysis.png/pdf` - Hub classification (in-degree vs out-degree)
-6. `fig9_top_bridges.png/pdf` - Top 15 evolutionary bridges
-7. `fig10_authority_composition.png/pdf` - Internal vs external influence
-8. `fig11_macro_community_flow.png/pdf` - Macroscopic inter-community flow
+1. `fig1_volume_vs_authority.png/pdf` - 3-panel: top 20 by volume, top 20 by authority, and scatter with surprise artists highlighted
+2. `fig2_hub_bridges.png/pdf` - Merged hub analysis (in-degree vs out-degree by cluster) and top 15 evolutionary bridges
+3. `fig3_authority_context.png/pdf` - Internal vs external influence for top 15 authorities
+4. `fig4_cluster_artist_network.png/pdf` - Top 50 artists by PageRank, colored by Louvain cluster (intra/inter edges distinguished)
+5. `fig5_cluster_distribution.png/pdf` - Cluster size histogram & top 20 largest communities
 
 **Auxiliary Files**:
 - `statistics_summary.txt` - Text statistics summary
@@ -192,10 +189,11 @@ An interactive D3.js visualization has been generated to explore the music sampl
 **File**: `project/outputs/interactive_genealogy.html`
 
 **Features**:
-- Pan and zoom the entire network
-- Click on nodes to view artist details and authority scores
-- Filter and isolate specific sampling lineages
-- Interactive legend for node sizing by in-degree
+- Pan and zoom the entire network with premium SVG glow effects for mega-hubs
+- Click on nodes to open a sleek glassmorphism sidebar with artist details and authority scores
+- Nodes are colored by their Louvain community (genealogical family)
+- Intra-cluster and inter-cluster edges are styled distinctly to reveal community boundaries
+- Node size is proportional to PageRank Authority
 
 **To view**: Open the file in any modern web browser.
 
@@ -225,8 +223,8 @@ An interactive D3.js visualization has been generated to explore the music sampl
 - Largest community: JAY-Z (2,196 artists)
 - Intra-cluster edge fraction: 0.7169 (72% of sampling stays within communities)
 
-### 3. Top 15 Network Clarity
-The `fig1_top15_sampling_network` visualization has been refined to show only **inter-connections** between the top 15 most-sampled artists, removing external clutter nodes for maximum clarity.
+### 3. Cluster-Colored Artist Network
+The `fig4_cluster_artist_network` visualization shows the top 50 artists by PageRank authority, colored by their Louvain cluster. Intra-cluster edges are shown in solid muted colors, while inter-cluster edges appear as gray dashed lines, revealing both community structure and cross-community influence.
 
 ---
 
@@ -236,7 +234,7 @@ The `fig1_top15_sampling_network` visualization has been refined to show only **
 - **File**: `report/DataMining.pdf`
 - **Language**: English
 - **Contents**: Complete methodology, algorithms, results, discussion
-- **Figures**: 10 publication-quality visualizations (300 DPI)
+- **Figures**: 5 publication-quality visualizations (300 DPI)
 
 ### Italian Explanation
 - **File**: `report/SpiegazioneFacile.md`

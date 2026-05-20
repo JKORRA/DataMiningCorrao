@@ -248,14 +248,7 @@ A crucial distinction of this methodology is that it operates blindly regarding 
 \subsection{Network Statistics and Validation}
 The final processed graph, after extensive data engineering using MusicBrainz GIDs and removing self-loops (artists sampling themselves), comprises \textbf{57,741 sampling events} (edges) connecting \textbf{67,638 songs} (nodes) across \textbf{23,404 unique artists}.
 
-The network exhibits classic \textbf{scale-free} characteristics, as evidenced by the power-law degree distribution shown in Figure~\ref{fig:degree_dist}.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.9\textwidth]{fig7_powerlaw_analysis.pdf}
-    \caption{Power-law validation: cumulative degree distribution (log-log scale). The approximately linear trend in log-log space is consistent with a power-law distribution, a hallmark of scale-free networks\cite{clauset2009powerlaw}. Concentration analysis shows top 1\% of artists control 23.5\%, top 5\% control 46.5\%, and top 10\% control 58.2\% of all sampling events.}
-    \label{fig:degree_dist}
-\end{figure}
+The network exhibits classic \textbf{scale-free} characteristics, typical of preferential attachment networks. The power-law concentration analysis confirms this: the top 1\% of artists control 23.5\% of all sampling events, the top 5\% control 46.5\%, and the top 10\% control 58.3\%. This pattern validates the hypothesis that musical influence follows the same mathematical principles as citation networks and social networks, where established authorities accumulate disproportionate influence over time.
 
 \textbf{Key Network Properties:}
 \begin{itemize}
@@ -265,8 +258,6 @@ The network exhibits classic \textbf{scale-free} characteristics, as evidenced b
     \item \textbf{Maximum In-Degree}: 370 (Daft Punk - most sampled artist)
     \item \textbf{Power-Law Concentration}: Top 1\% of artists control 23.5\% of all sampling events, Top 10\% control 58.3\%
 \end{itemize}
-
-\noindent This concentration pattern validates the scale-free network hypothesis: musical influence follows preferential attachment, where established authorities accumulate disproportionate influence over time.
 
 \subsection{PageRank Authority Rankings}
 The PageRank algorithm runs a fixed \textbf{50 iterations} (tolerance $< 0.01$), producing authority scores that reveal the structural importance of artists beyond mere volume. Table~\ref{tab:top10comparison} presents the comparison of the top 10 artists by volume versus authority.
@@ -278,8 +269,8 @@ Comparing the results of Degree Centrality (Volume) against PageRank (Authority)
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth]{fig2_volume_vs_authority.pdf}
-    \caption{Top 20 artists: Volume (In-Degree) vs. Authority (PageRank). The two rankings reveal a critical gap: high volume does not always translate to high structural authority, exposing the role of community density in PageRank scores.}
+    \includegraphics[width=\textwidth]{fig1_volume_vs_authority.pdf}
+    \caption{Volume (In-Degree) vs. Authority (PageRank) — 3-panel comparison. Left: top 20 by volume. Center: top 20 by authority. Right: scatter plot revealing "surprise" artists — Daniel Ingram and Denonbu rank high in authority despite moderate volume (red), while Daft Punk and Lady Gaga dominate volume but rank lower in authority (blue).}
     \label{fig:volume_authority}
 \end{figure}
 
@@ -289,45 +280,24 @@ Comparing the results of Degree Centrality (Volume) against PageRank (Authority)
     \item \textbf{The Community-Driven Outlier}: \textbf{Daniel Ingram} (composer for \textit{My Little Pony}) achieves the highest PageRank (59.38) despite only 130 sampling events. As explored later in the Authority Context analysis, this is driven by a dense, insular fan community rather than mainstream influence --- illustrating how PageRank can be amplified by tight cluster structures.
 \end{itemize}
 
-\subsection{Musical Genealogy Networks}
-To visualize the actual ``who sampled who'' relationships, I created network diagrams showing the structural genealogy of music. Each visualization isolates a specific aspect of the network to make the results clear and interpretable.
 
-\subsubsection{Top 15 Most-Sampled Artists Network}
-Figure~\ref{fig:top15network} shows the core sampling relationships among the 15 most-sampled artists by volume (in-degree). To avoid visual clutter, only connections with weight $\geq$ 2 are displayed.
+\subsection{Artist Classification: Hub Analysis \& Bridges}
+Figure~\ref{fig:hubbridges} merges two complementary views of artist roles. The left panel classifies artists by their sampling behavior (in-degree vs. out-degree), with dots colored by cluster membership. The right panel shows the top 15 "evolutionary bridges" — artists with the highest geometric mean of in-degree and out-degree — with bars colored by their cluster.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth]{fig1_top15_sampling_network.pdf}
-    \caption{Top 15 most-sampled artists and their inter-connections. Arrows point from sampler to original artist. Node size is proportional to sampling volume. This view reveals which top artists also sample each other, forming the backbone of the sampling ecosystem.}
-    \label{fig:top15network}
-\end{figure}
-
-
-
-\subsection{Artist Classification: Hub Analysis}
-Figure~\ref{fig:hubanalysis} classifies artists based on their sampling behavior, plotting in-degree (times sampled) against out-degree (samples used). The dashed lines represent median values, dividing the space into four quadrants that reveal distinct artist roles.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.95\textwidth]{fig7_hub_analysis.pdf}
-    \caption{Hub analysis scatter plot. X-axis: out-degree (samples used). Y-axis: in-degree (times sampled). Top 15 most-sampled artists are highlighted in red. Four quadrants are delineated by median lines: Authorities (top-left), Bridges (top-right), Heavy Samplers (bottom-right), and Peripheral Artists (bottom-left).}
-    \label{fig:hubanalysis}
+    \includegraphics[width=\textwidth]{fig2_hub_bridges.pdf}
+    \caption{Merged hub analysis and bridge discovery. Left: in-degree vs out-degree scatter (dots colored by cluster, red = top 15 by volume). Right: top 15 bridges by geometric mean of in and out degree (bars colored by cluster). Four quadrants are delineated by median lines: Authorities (top-left), Bridges (top-right), Heavy Samplers (bottom-right), and Peripheral Artists (bottom-left).}
+    \label{fig:hubbridges}
 \end{figure}
 
 \textbf{Artist Classifications:}
 \begin{itemize}
     \item \textbf{Pure Authorities} (top-left quadrant): Artists like James Brown and Daft Punk --- sampled extensively but use few samples themselves. They are the ``source material'' of modern music.
-    \item \textbf{Bridges} (top-right quadrant): Artists who both sample heavily AND get sampled. As discovered in our bridge analysis (Figure~\ref{fig:topbridges}), evolutionary nodes like \textbf{JAY-Z}, \textbf{Beastie Boys}, and \textbf{Ye (Kanye West)} maintain a near-perfect balance, acting as the crucial connective tissue of modern music.
+    \item \textbf{Bridges} (top-right quadrant): Artists who both sample heavily AND get sampled. Evolutionary nodes like \textbf{JAY-Z}, \textbf{Beastie Boys}, and \textbf{Ye (Kanye West)} maintain a near-perfect balance, acting as the crucial connective tissue of modern music.
     \item \textbf{Heavy Samplers} (bottom-right quadrant): Modern producers who rely extensively on sampling but haven't yet become authorities themselves.
-    \item \textbf{Peripheral Artists} (bottom-left quadrant): Artists with below-median in-degree and out-degree. These represent the majority of nodes in the long tail of the distribution --- niche creators or artists with few documented sampling relationships in the dataset.
+    \item \textbf{Peripheral Artists} (bottom-left quadrant): Artists with below-median in-degree and out-degree. These represent the majority of nodes in the long tail of the distribution.
 \end{itemize}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.95\textwidth]{fig9_top_bridges.pdf}
-    \caption{Top 15 Evolutionary Bridges. These artists maintain the highest geometric mean of in-degree and out-degree, representing key evolutionary nodes in the musical network.}
-    \label{fig:topbridges}
-\end{figure}
 
 \subsection{External Validation Against Ground Truth}
 To assess the robustness of our PageRank authority rankings, we performed external validation using a curated list of the 10 most-sampled artists from \textbf{WhoSampled}\cite{whosampled}, an independent sampling reference. We computed the Spearman rank correlation between the WhoSampled ground-truth ordering and our PageRank rankings, considering only the same 10-artist subset.
@@ -341,9 +311,19 @@ Figure~\ref{fig:authoritycontext} proves the "Insular Community Hypothesis". Whi
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\textwidth]{fig10_authority_composition.pdf}
-    \caption{Authority Context: Internal vs External Influence. This chart reveals whether an artist's authority is driven by a massive, isolated sub-culture (Internal) or by universal mainstream adoption across genres (External).}
+    \includegraphics[width=1\textwidth]{fig3_authority_context.pdf}
+    \caption{Authority Context: Internal vs External Influence. This chart reveals whether an artist's authority is driven by a massive, isolated sub-culture (Internal) or by universal mainstream adoption across genres (External). Sample sizes (n) are shown for each artist.}
     \label{fig:authoritycontext}
+\end{figure}
+
+\subsection{Genealogical Families: Cluster-Colored Network}
+Figure~\ref{fig:clusternetwork} visualizes the top 50 influential artists by PageRank authority, with each node colored by its Louvain cluster. This view bridges the gap between individual artist analysis and abstract community structure: it reveals which communities produce the most structurally important artists, and whether influence flows within or across cluster boundaries.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{fig4_cluster_artist_network.pdf}
+    \caption{Top 50 artists by PageRank authority, colored by Louvain cluster. Solid edges indicate intra-cluster sampling (same community), dashed edges indicate inter-cluster sampling (cross-community). Node size is proportional to connection degree.}
+    \label{fig:clusternetwork}
 \end{figure}
 
 \subsection{Graph Statistics Summary}
@@ -378,14 +358,14 @@ Table~\ref{tab:graphstats} provides a comprehensive overview of the network's ma
 \end{table}
 
 \subsubsection{Interactive D3.js Visualization}
-To effectively explore the immense scale of the expanded dataset (over 58,000 edges), I also developed an interactive web-based D3.js visualization that allows users to pan, zoom, and click on nodes to inspect real-time Authority Scores and isolate specific sampling lineages. The interactive visualization is available at: \href{file:../project/outputs/interactive_genealogy.html}{interactive\_genealogy.html}
+To effectively explore the immense scale of the expanded dataset (over 58,000 edges), I also developed an interactive web-based D3.js visualization that allows users to pan, zoom, and click on nodes to inspect real-time Authority Scores and isolate specific sampling lineages. The visualization colors nodes by their genealogical family (Louvain cluster) and uses distinct edge styling for intra-cluster and inter-cluster connections, mirroring the logic of Figure~\ref{fig:clusternetwork}. The interactive visualization is available at: \href{file:../project/outputs/interactive_genealogy.html}{interactive\_genealogy.html}
 
 \subsection{Community Detection and Genealogical Families}
 The Louvain algorithm detected \textbf{1,774 distinct communities} with an intra-cluster edge fraction of \textbf{0.7169}, indicating a strong and well-defined community structure. This metric represents the proportion of edges that fall within the same community; a value of 0.7169 means that approximately 72\% of sampling connections occur between artists in the same genealogical family, while only 28\% cross community boundaries. This suggests the music network is far more structured and compartmentalized than previously estimated — most sampling stays within genealogical communities.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\textwidth]{fig4_cluster_distribution.pdf}
+    \includegraphics[width=\textwidth]{fig5_cluster_distribution.pdf}
     \caption{Distribution of community sizes. The long tail indicates most communities are small genealogical "chains" while a few represent major musical movements.}
     \label{fig:clusterdist}
 \end{figure}
@@ -396,19 +376,6 @@ The Louvain algorithm detected \textbf{1,774 distinct communities} with an intra
     \item \textbf{Intra-Cluster Edge Fraction 0.7169}: approximately 71.7\% of edges are intra-community, indicating strong community structure. This aligns with the intuition that sampling influence mostly flows within genealogical lineages.
     \item \textbf{1,774 communities}: This relatively contained number of communities reflects the Louvain algorithm's ability to find meaningful, hierarchically optimal partitions without over-fragmenting the network.
 \end{itemize}
-
-\subsubsection{Macro-Flow: Inter-Community Genealogy}
-While the Louvain algorithm identifies well-defined communities, music evolution occurs when these communities interact. By aggregating edges at the cluster level, we mapped the macroscopic flow of influence.
-
-As shown in Figure~\ref{fig:macroflow}, distinct musical pipelines emerge. Instead of analyzing individual artists, we can observe how entire ecosystems feed into others, providing a higher-level view of genre cross-pollination.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=1\textwidth]{fig11_macro_community_flow.pdf}
-    \caption{Macroscopic Sampling Flow Between Communities. Node size represents total incoming cluster influence, and edge thickness represents the volume of sampling between distinct communities.}
-    \label{fig:macroflow}
-\end{figure}
-
 
 
 \clearpage

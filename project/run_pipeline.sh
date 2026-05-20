@@ -147,46 +147,46 @@ fi
 # =============================================================================
 # STEP 7: VISUALIZATION
 # =============================================================================
-print_step "STEP 7/12: Network Visualization (IMPROVED)"
+print_step "STEP 7/12: Cluster-Colored Artist Network (Fig 4)"
 
 python3 utils/visualize_cluster.py
 if [ $? -eq 0 ]; then
-    print_success "Visualization generated → music_genealogy_final.png"
+    print_success "Cluster-colored network generated → figures/report_figures/"
 else
     print_error "Visualization failed!"
     exit 1
 fi
 
 # =============================================================================
-# STEP 7.5: GENEALOGY VISUALIZATIONS
+# STEP 8: GENEALOGY VISUALIZATIONS (Fig 2)
 # =============================================================================
-print_step "STEP 7.5/12: Report-Quality Network Visualizations"
+print_step "STEP 8/12: Hub Analysis + Bridges (Fig 2)"
 
 python3 src/genealogy_visualizations.py
 if [ $? -eq 0 ]; then
-    print_success "Genealogy visualizations generated → figures/"
+    print_success "Hub + bridges visualization generated → figures/"
 else
     print_error "Genealogy visualizations failed!"
     exit 1
 fi
 
 # =============================================================================
-# STEP 8: ADVANCED EXPERIMENTS
+# STEP 9: ADVANCED EXPERIMENTS (Fig 3)
 # =============================================================================
-print_step "STEP 8/12: Advanced Experiments (Bridges, Authority, Macro Flow)"
+print_step "STEP 9/12: Authority Context Analysis (Fig 3)"
 
 python3 src/advanced_experiments.py
 if [ $? -eq 0 ]; then
-    print_success "Advanced experiments completed → figures/"
+    print_success "Authority context completed → figures/"
 else
     print_error "Advanced experiments failed!"
     exit 1
 fi
 
 # =============================================================================
-# STEP 9: REPORT FIGURES
+# STEP 10: REPORT FIGURES (Fig 1 + Fig 5)
 # =============================================================================
-print_step "STEP 9/12: Generate Report Figures (Publication Quality)"
+print_step "STEP 10/12: Generate Report Figures (Fig 1 + Fig 5)"
 
 python3 src/generate_report_figures.py
 if [ $? -eq 0 ]; then
@@ -197,9 +197,9 @@ else
 fi
 
 # =============================================================================
-# STEP 10: EXTERNAL VALIDATION
+# STEP 11: EXTERNAL VALIDATION
 # =============================================================================
-print_step "STEP 10/12: External Validation against Ground Truth"
+print_step "STEP 11/12: External Validation against Ground Truth"
 
 python3 src/external_validation.py
 if [ $? -eq 0 ]; then
@@ -210,9 +210,9 @@ else
 fi
 
 # =============================================================================
-# STEP 11: INTERACTIVE VISUALIZATION
+# STEP 12: INTERACTIVE VISUALIZATION
 # =============================================================================
-print_step "STEP 11/12: Generate Interactive Network (D3.js)"
+print_step "STEP 12/12: Generate Interactive Network (D3.js)"
 
 python3 utils/generate_interactive_network.py
 if [ $? -eq 0 ]; then
@@ -236,17 +236,21 @@ echo "  • music_graph.parquet - Main graph structure"
 echo "  • artist_pagerank.parquet - Authority scores"
 echo "  • music_labels.parquet - Cluster assignments"
 echo "  • top_100_artists_pagerank.csv - Top artists by authority"
-echo "  • music_clusters.csv - Cluster sizes"
+echo "  • music_clusters.csv - Cluster statistics"
 echo "  • validation_summary.csv - Graph statistics"
-echo "  • cluster_quality_summary.csv - Clustering metrics"
+echo "  • cluster_quality_summary.csv - Cluster quality metrics"
 echo "  • cluster_sizes.csv - Detailed cluster distribution"
 echo "  • cluster_bridges.csv - Inter-cluster connections"
 echo "  • external_validation.csv - Ground truth correlation"
 echo "  • interactive_genealogy.html - D3.js Network Explorer"
 echo ""
 echo "📈 Report Figures (figures/):"
-echo "  report_figures/ - 10 statistical/network figures (PNG + PDF)"
-echo "  • Publication-quality figures (300 DPI)"
+echo "  report_figures/ - 5 publication-quality figures (PNG + PDF)"
+echo "  • Fig 1: Volume vs Authority (3-panel)"
+echo "  • Fig 2: Hub Analysis + Bridges"
+echo "  • Fig 3: Authority Context"
+echo "  • Fig 4: Cluster-Colored Artist Network"
+echo "  • Fig 5: Cluster Distribution"
 
 echo ""
 echo "⏱️  Total execution time: $(($duration / 60)) minutes $(($duration % 60)) seconds"
@@ -255,8 +259,8 @@ echo "📅 Completed at: $(date)"
 echo ""
 echo -e "${YELLOW}Next Steps:${NC}"
 echo "  1. Review outputs/validation_summary.csv for graph statistics"
-echo "  2. Check outputs/cluster_quality_summary.csv for modularity score"
-echo "  3. View figures/report_figures/ for network visualizations"
+echo "  2. Check outputs/cluster_quality_summary.csv for cluster quality metrics"
+echo "  3. View figures/report_figures/ for the 5 report figures"
 echo "  4. Read ../README.md for complete project documentation"
 
 print_success "End!"

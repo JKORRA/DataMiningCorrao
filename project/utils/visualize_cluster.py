@@ -1,183 +1,222 @@
 """
-Cluster Visualization
-Visualizes the music genealogy clusters using network graphs.
-Uses a modern dark theme with readable labels.
+Cluster-Colored Artist Network
+Light-theme network graph showing top artists by PageRank, colored by their Louvain cluster.
+Intra-cluster edges in muted cluster color, inter-cluster edges in gray.
 """
 
 import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-import matplotlib.colors as mcolors
+import matplotlib.patches as mpatches
 import numpy as np
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, count
+from pyspark.sql.functions import col, count, desc
+import os
+import shutil
 
-plt.rcParams["font.sans-serif"] = ["DejaVu Sans", "Droid Sans Fallback", "IPAGothic", "IPAMincho", "sans-serif"]
+plt.rcParams["font.sans-serif"] = ["Noto Sans CJK JP", "Arial Unicode MS", "DejaVu Sans", "Droid Sans Fallback", "IPAGothic", "IPAMincho", "sans-serif"]
 plt.rcParams["axes.unicode_minus"] = False
 
-spark = SparkSession.builder \
-    .appName("MusicGenealogy_FinalViz") \
-    .config("spark.driver.memory", "4g") \
+plt.style.use("seaborn-v0_8-whitegrid")
+plt.rcParams["figure.dpi"] = 300
+plt.rcParams["savefig.dpi"] = 300
+plt.rcParams["font.size"] = 11
+plt.rcParams["axes.labelsize"] = 12
+plt.rcParams["axes.titlesize"] = 14
+plt.rcParams["legend.fontsize"] = 9
+
+output_dir = "figures/report_figures"
+os.makedirs(output_dir, exist_ok=True)
+
+TOP_N = 50
+MIN_EDGE_WEIGHT = 1
+MAX_LEGEND_CLUSTERS = 10
+
+spark = (
+    SparkSession.builder.appName("ClusterArtistNetwork")
+    .config("spark.driver.memory", "6g")
     .getOrCreate()
+)
 spark.sparkContext.setLogLevel("ERROR")
 
 print("Loading data...")
 df_graph = spark.read.parquet("outputs/music_graph.parquet")
+df_pagerank = spark.read.parquet("outputs/artist_pagerank.parquet")
 df_labels = spark.read.parquet("outputs/music_labels.parquet")
 
-# Select top connections for visualization
-print("Selecting top connections...")
+print("Selecting top artists by PageRank...")
+top_artists_rows = df_pagerank.orderBy(desc("authority_score")).limit(TOP_N).collect()
+top_artists = [row['artist'] for row in top_artists_rows]
+pagerank_scores = {row['artist']: row['authority_score'] for row in top_artists_rows}
 
-try:
-    pagerank_df = spark.read.parquet("outputs/artist_pagerank.parquet")
-    top_artists_list = [row['artist'] for row in pagerank_df.orderBy(col("authority_score").desc()).limit(40).collect()]
-    print(f"Selected top 40 artists by PageRank")
-except Exception as e:
-    print(f"PageRank not found ({e}), using degree-based fallback")
-    # Fallback: use artists that appear most frequently in edges
-    top_sampler = df_graph.groupBy("Sampler_Artist_Name").agg(count("*").alias("cnt"))
-    top_original = df_graph.groupBy("Original_Artist_Name").agg(count("*").alias("cnt"))
-    top_artists_list = [r[0] for r in top_sampler.union(top_original).orderBy(col("cnt").desc()).limit(40).collect()]
+print("Getting artist-to-cluster mapping...")
+artist_cluster_pd = df_labels.select("artist_name", "cluster_representative").dropDuplicates(["artist_name"]).toPandas()
+cluster_map = dict(zip(artist_cluster_pd["artist_name"], artist_cluster_pd["cluster_representative"]))
 
-# Get edges involving top artists (on BOTH sides for cleaner subgraph)
-top_edges = df_graph.filter(
-    col("Original_Artist_Name").isin(top_artists_list) &
-    col("Sampler_Artist_Name").isin(top_artists_list)
-).groupBy("Sampler_Artist_Name", "Original_Artist_Name") \
- .agg(count("*").alias("weight")) \
- .orderBy(col("weight").desc()) \
- .limit(120)
-
-# Get cluster info for coloring
-viz_data = top_edges.join(
-    df_labels.select(col("artist_name"), col("cluster_id"), col("cluster_representative")),
-    top_edges.Original_Artist_Name == df_labels.artist_name,
-    "left"
-).select(
-    col("Sampler_Artist_Name"),
-    col("Original_Artist_Name"),
-    col("weight"),
-    col("cluster_id")
+print(f"Getting edges among top {TOP_N} artists...")
+edges_pd = (
+    df_graph.filter(
+        col("Sampler_Artist_Name").isin(top_artists) &
+        col("Original_Artist_Name").isin(top_artists)
+    )
+    .groupBy("Sampler_Artist_Name", "Original_Artist_Name")
+    .agg(count("*").alias("weight"))
+    .filter(col("weight") >= MIN_EDGE_WEIGHT)
+    .toPandas()
 )
 
-pdf = viz_data.toPandas()
-
-# Also try to get cluster info for ALL nodes via artist names
-all_artists_in_graph = set(pdf["Sampler_Artist_Name"].tolist() + pdf["Original_Artist_Name"].tolist())
+print(f"Edges found: {len(edges_pd)}")
 
 spark.stop()
 
-# Generate graph visualization
-print(f"Generating graph with {len(pdf)} edges...")
-
 G = nx.DiGraph()
 
-for _, row in pdf.iterrows():
-    sampler = row['Sampler_Artist_Name']
-    original = row['Original_Artist_Name']
-    weight = row['weight']
-    clus_id = row['cluster_id'] if pd.notna(row['cluster_id']) else "unknown"
+for a in top_artists:
+    G.add_node(a)
 
-    G.add_node(original, cluster=clus_id)
-    if sampler not in G.nodes:
-        G.add_node(sampler, cluster=clus_id)
+for _, row in edges_pd.iterrows():
+    G.add_edge(row["Sampler_Artist_Name"], row["Original_Artist_Name"], weight=row["weight"])
 
-    G.add_edge(sampler, original, weight=weight)
+print(f"Graph has {len(G.nodes)} nodes, {len(G.edges)} edges")
 
-if len(G.nodes) == 0:
-    print("WARNING: No edges found for top artists. The graph is empty.")
-    exit(0)
+degree_dict = dict(G.degree())
 
-# Assign colors based on clusters
-unique_clusters = sorted(list(set(nx.get_node_attributes(G, 'cluster').values())))
-# Use a perceptually distinct colormap
-cmap = plt.colormaps["Set2"].resampled(max(len(unique_clusters), 8))
-cluster_color_map = {cid: cmap(i) for i, cid in enumerate(unique_clusters)}
+cluster_colors = {}
+for node in G.nodes():
+    clus = cluster_map.get(node, "Unknown")
+    if clus not in cluster_colors:
+        cluster_colors[clus] = None
+
+unique_clusters = sorted(cluster_colors.keys(), key=lambda c: sum(1 for n in G.nodes() if cluster_map.get(n, "Unknown") == c), reverse=True)
+
+cmap_name = "tab20" if len(unique_clusters) > 10 else "tab10"
+cmap = plt.colormaps[cmap_name]
+cluster_color_map = {clus: cmap(i % cmap.N) for i, clus in enumerate(unique_clusters)}
+cluster_color_map["Unknown"] = (0.6, 0.6, 0.6, 1)
 
 node_colors = []
 for node in G.nodes():
-    cid = G.nodes[node].get('cluster', 'unknown')
-    node_colors.append(cluster_color_map.get(cid, (0.6, 0.6, 0.6, 1)))
+    clus = cluster_map.get(node, "Unknown")
+    node_colors.append(cluster_color_map.get(clus, (0.6, 0.6, 0.6, 1)))
 
-# Set node sizes based on degree
-d = dict(G.degree)
-node_sizes = [v * 120 + 400 for v in d.values()]
+pr_values = list(pagerank_scores.values())
+min_pr, max_pr = min(pr_values), max(pr_values)
+if max_pr > min_pr:
+    node_sizes = [500 + 2000 * (np.sqrt(max(0, pagerank_scores.get(node, min_pr) - min_pr)) / np.sqrt(max(1e-9, max_pr - min_pr))) for node in G.nodes()]
+else:
+    node_sizes = [800 for node in G.nodes()]
 
-# Use spring layout with higher repulsion for readability
-pos = nx.spring_layout(G, k=2.2, iterations=150, seed=42)
+pos = nx.spring_layout(G, k=2.5, iterations=200, seed=42)
 
-# --- Modern dark theme ---
-fig, ax = plt.subplots(figsize=(22, 15), facecolor='#0f0e17')
-ax.set_facecolor('#0f0e17')
+fig, ax = plt.subplots(figsize=(20, 16))
 
-# Draw edges with glow effect
-edge_weights = [G[u][v].get('weight', 1) for u, v in G.edges()]
+edges_drawn = G.edges()
+edge_weights = [G[u][v].get("weight", 1) for u, v in edges_drawn]
 max_w = max(edge_weights) if edge_weights else 1
 
-# Subtle glow layer
-nx.draw_networkx_edges(
-    G, pos, ax=ax,
-    edge_color='#ff890640',
-    width=[0.5 + 2.5 * (w / max_w) for w in edge_weights],
-    alpha=0.3,
-    arrowstyle='->', arrowsize=18,
-    connectionstyle='arc3,rad=0.08'
-)
-# Main edge layer
-nx.draw_networkx_edges(
-    G, pos, ax=ax,
-    edge_color='#ffffff18',
-    width=[0.3 + 1.5 * (w / max_w) for w in edge_weights],
-    alpha=0.6,
-    arrowstyle='->', arrowsize=14,
-    connectionstyle='arc3,rad=0.08'
-)
+for u, v in edges_drawn:
+    w = G[u][v].get("weight", 1)
+    width = 0.5 + 2.5 * (w / max_w)
 
-# Draw nodes with border
+    u_cluster = cluster_map.get(u, "Unknown")
+    v_cluster = cluster_map.get(v, "Unknown")
+
+    if u_cluster == v_cluster and u_cluster != "Unknown":
+        base_color = cluster_color_map.get(u_cluster, (0.5, 0.5, 0.5))
+        edge_color = (base_color[0], base_color[1], base_color[2], 0.35)
+        style = "solid"
+    else:
+        edge_color = (0.6, 0.6, 0.6, 0.15)
+        style = "dashed"
+
+    ax.annotate(
+        "",
+        xy=pos[v], xytext=pos[u],
+        arrowprops=dict(
+            arrowstyle="-|>", color=edge_color, lw=width,
+            connectionstyle="arc3,rad=0.12", linestyle=style,
+            alpha=0.7,
+        ),
+    )
+
 nx.draw_networkx_nodes(
     G, pos, ax=ax,
     node_size=node_sizes,
     node_color=node_colors,
-    alpha=0.92,
-    edgecolors='white',
-    linewidths=1.2
+    edgecolors="white",
+    linewidths=1.5,
+    alpha=0.9,
 )
 
-# Draw labels with background boxes for readability
-for node, (x, y) in pos.items():
-    deg = G.degree(node)
-    fontsize = min(10, max(7, 6 + deg * 0.5))
-    ax.text(
-        x, y + 0.03,
-        node,
-        fontsize=fontsize,
-        fontweight='bold',
-        color='#fffffe',
-        ha='center', va='center',
-        bbox=dict(
-            boxstyle='round,pad=0.25',
-            facecolor='#0f0e17',
-            edgecolor='none',
-            alpha=0.75
+for node in G.nodes():
+    if node in pos:
+        x, y = pos[node]
+        pr_score = pagerank_scores.get(node, min_pr)
+        if max_pr > min_pr:
+            pr_norm = np.sqrt(max(0, pr_score - min_pr)) / np.sqrt(max(1e-9, max_pr - min_pr))
+        else:
+            pr_norm = 0.5
+        fs = min(13, max(8, 8 + pr_norm * 5))
+        ax.text(
+            x, y, node,
+            fontsize=fs, fontweight="bold",
+            ha="center", va="center",
+            bbox=dict(boxstyle="round,pad=0.1", facecolor="white", edgecolor="none", alpha=0.85),
         )
-    )
+
+legend_patches = []
+shown = 0
+for clus in unique_clusters:
+    if clus == "Unknown":
+        continue
+    if shown >= MAX_LEGEND_CLUSTERS:
+        break
+    count_in_graph = sum(1 for n in G.nodes() if cluster_map.get(n, "Unknown") == clus)
+    color = cluster_color_map[clus]
+    label = f"{clus} ({count_in_graph})"
+    legend_patches.append(mpatches.Patch(color=color, label=label))
+    shown += 1
+
+if "Unknown" in cluster_color_map:
+    unknown_count = sum(1 for n in G.nodes() if cluster_map.get(n, "Unknown") == "Unknown")
+    if unknown_count > 0:
+        legend_patches.append(mpatches.Patch(color=(0.6, 0.6, 0.6), label=f"Unknown ({unknown_count})"))
+
+ax.legend(
+    handles=legend_patches,
+    loc="upper left",
+    framealpha=0.9,
+    fontsize=8,
+    title="Cluster (artists in graph)",
+    title_fontsize=9,
+)
 
 ax.set_title(
-    "Music Genealogy: Top Influential Families",
-    fontsize=22, fontweight='bold', color='#ff8906',
-    pad=20
+    f"Top {TOP_N} Influential Artists by Cluster\n(Node size based on PageRank authority, Color = Louvain cluster, Solid edges = intra-cluster, Dashed = inter-cluster)",
+    fontsize=15, fontweight="bold", pad=20,
 )
 ax.text(
-    0.5, 0.97,
-    "Arrow: sampler → original artist  |  Node size = connection degree  |  Color = cluster",
-    transform=ax.transAxes, ha='center', va='top',
-    fontsize=10, color=(1, 1, 1, 0.4),
-    style='italic'
+    0.5, 0.98,
+    "Arrow: sampler → original artist",
+    transform=ax.transAxes, ha="center", va="top",
+    fontsize=9, color="gray", style="italic",
 )
-ax.axis('off')
+ax.axis("off")
 
-filename = "outputs/music_genealogy_final.png"
-plt.savefig(filename, dpi=180, bbox_inches='tight', facecolor='#0f0e17')
-print(f"✓ Graph saved: {filename}")
+plt.tight_layout()
+
+png_path = f"{output_dir}/fig4_cluster_artist_network.png"
+pdf_path = f"{output_dir}/fig4_cluster_artist_network.pdf"
+plt.savefig(png_path, dpi=300, bbox_inches="tight")
+plt.savefig(pdf_path, bbox_inches="tight")
+print(f"Saved: {png_path}")
+print(f"Saved: {pdf_path}")
 plt.close()
+
+report_img_dir = "../report/Immagini"
+if os.path.exists(report_img_dir):
+    shutil.copy2(png_path, os.path.join(report_img_dir, "fig4_cluster_artist_network.png"))
+    shutil.copy2(pdf_path, os.path.join(report_img_dir, "fig4_cluster_artist_network.pdf"))
+    print(f"Copied to {report_img_dir}/")
+
+print("Done!")

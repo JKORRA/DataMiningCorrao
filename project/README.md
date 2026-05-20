@@ -112,12 +112,11 @@ python3 src/compute_authority_manual.py
 
 ### Visualization
 - **generate_report_figures.py** (23,159 bytes)
-  - Generates statistical plots for report
-  - Rankings, cluster analysis, power-law validation
+  - Generates Fig 1 (Volume vs Authority, 3-panel) and Fig 5 (Cluster Distribution)
   - Output: `figures/report_figures/` (PNG + PDF)
   
 - **genealogy_visualizations.py** (21,864 bytes)
-  - Generates network diagrams: top 15 sampling network, hub analysis
+  - Generates Fig 2: merged hub analysis + top bridges
   - Output: `figures/report_figures/` (PNG + PDF)
 
 ### Utilities
@@ -126,8 +125,9 @@ python3 src/compute_authority_manual.py
   - Used for data quality investigation
   
 - **visualize_cluster.py**
-  - Visualizes individual cluster structure
-  - Helpful for exploratory analysis
+  - Generates Fig 4: cluster-colored artist network (top 50 by PageRank)
+  - Light theme, intra/inter edge distinction, cluster legend
+  - Output: `figures/report_figures/` (PNG + PDF)
 
 - **generate_interactive_network.py**
   - D3.js force-directed graph of the top artists
@@ -158,18 +158,13 @@ All analysis results are stored in `outputs/`:
 
 ## 🎨 Generated Figures
 
-### Statistical Plots (`figures/report_figures/`)
-1. **fig2_volume_vs_authority.png/pdf** - Top 20 comparison (in-degree vs PageRank)
-2. **fig4_cluster_distribution.png/pdf** - Cluster size histogram
-3. **fig7_powerlaw_analysis.png/pdf** - Cumulative degree distribution (log-log)
-4. **statistics_summary.txt** - Text statistics
-
-### Network Diagrams (`figures/report_figures/`)
-1. **fig1_top15_sampling_network.png/pdf** - Core sampling relationships among top 15
-2. **fig7_hub_analysis.png/pdf** - Hub analysis: in-degree vs out-degree scatter
-3. **fig9_top_bridges.png/pdf** - Top 15 evolutionary bridges
-4. **fig10_authority_composition.png/pdf** - Internal vs external influence
-5. **fig11_macro_community_flow.png/pdf** - Macroscopic inter-community sampling flow
+### Report Figures (`figures/report_figures/`)
+1. **fig1_volume_vs_authority.png/pdf** - 3-panel: top 20 by volume, top 20 by authority, scatter with surprise artists
+2. **fig2_hub_bridges.png/pdf** - Merged hub analysis + top 15 evolutionary bridges (cluster-colored)
+3. **fig3_authority_context.png/pdf** - Internal vs external influence for top 15 authorities
+4. **fig4_cluster_artist_network.png/pdf** - Top 50 artists by PageRank, colored by cluster
+5. **fig5_cluster_distribution.png/pdf** - Cluster size histogram & top 20 communities
+6. **statistics_summary.txt** - Text statistics
 
 All figures are 300 DPI, publication-quality.
 
