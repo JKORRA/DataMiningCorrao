@@ -307,12 +307,12 @@ The resulting Spearman correlation coefficient is $\rho = 0.72$ ($p = 0.29$, $n 
 \subsection{Authority Context: Internal vs External Influence}
 While PageRank effectively models authority, it does not distinguish between \textit{global} mainstream influence and \textit{insular} community dominance. To investigate the "Daniel Ingram anomaly" (an artist with moderate volume but the highest PageRank), we analyzed the composition of incoming samples for the top 15 authorities.
 
-Figure~\ref{fig:authoritycontext} proves the "Insular Community Hypothesis". While mainstream authorities like James Brown receive the vast majority of their influence from outside their immediate community, Daniel Ingram's authority is driven by a dense, internal network of dedicated remixers.
+Figure~\ref{fig:authoritycontext} proves the "Insular Community Hypothesis". Both James Brown and Daniel Ingram receive most of their influence from inside their own community (74\% and 89\% respectively). The key difference is community scale: James Brown's community spans 2,196 artists (hip-hop/funk/soul --- the mainstream of modern music), while Daniel Ingram's is a tight-knit circle of \textasciitilde50\textendash100 My Little Pony fan remixers. PageRank amplifies authority inside dense clusters regardless of size --- the community context reveals whether that authority is global or insular.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=1\textwidth]{fig3_authority_context.pdf}
-    \caption{Authority Context: Internal vs External Influence. This chart reveals whether an artist's authority is driven by a massive, isolated sub-culture (Internal) or by universal mainstream adoption across genres (External). Sample sizes (n) are shown for each artist.}
+    \caption{Authority Context: Internal vs External Influence. This chart reveals what fraction of an artist's incoming samples come from inside their own community vs.\ from outside. Artists with high internal influence but a large, diverse community (like James Brown) earned their PageRank legitimately. Artists with high internal influence in a small, isolated community (like Daniel Ingram) have PageRank inflated by the cluster's density. Sample sizes (n) are shown for each artist.}
     \label{fig:authoritycontext}
 \end{figure}
 
