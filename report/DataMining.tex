@@ -28,6 +28,9 @@
 \usepackage{graphicx,subcaption}
 \graphicspath{{./Immagini/}}
 
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc}
+
 \usepackage[sorting=none]{biblatex}
 \addbibresource{Tesi.bib}
 \usepackage{csquotes} % needed by biblatex
@@ -63,11 +66,10 @@
 \clearpage
 
 \begin{abstract}
-This project analyzes the genealogy of music through sampling relationships, modeling the music ecosystem as a directed graph where nodes represent songs and edges represent sampling events. We process 57,741 sampling events connecting 67,638 songs across 23,404 unique artists from the MusicBrainz database. Our analysis reveals that structural authority, measured via PageRank, differs significantly from raw popularity metrics: Daniel Ingram emerges as the top structural authority (PageRank: 60.05) despite moderate sampling volume, while Denonbu (Denonbu) ranks second (PageRank: 40.03). The network exhibits classic scale-free characteristics, with the top 1\% of artists controlling 23.5\% of all sampling events. Louvain community detection identifies 1,774 distinct musical communities with an intra-cluster edge fraction of 0.7169, indicating that approximately 72\% of sampling occurs within the same community — a far more structured landscape than previously estimated. External validation against WhoSampled ground truth yields a Spearman correlation of $\rho = 0.72$, confirming that our structural authority metric captures a dimension of influence distinct from raw sampling counts.
-\end{abstract}
+This project analyzes the genealogy of music through sampling relationships, modeling the music ecosystem as a directed graph where nodes represent songs and edges represent sampling events. We process 57,741 sampling events connecting 67,638 songs across 23,404 unique artists from the MusicBrainz database.
 
-\vspace{1cm}
-\noindent\textbf{Keywords:} Network Analysis, PageRank, Louvain Community Detection, Music Information Retrieval, Apache Spark, Power-Law Distribution
+\textbf{Key Findings:} Our analysis reveals that structural authority, measured via PageRank, differs significantly from raw popularity metrics: Daniel Ingram emerges as the top structural authority (PageRank: 60.05) despite moderate sampling volume, while Denonbu ranks second (PageRank: 40.03). The network exhibits classic scale-free characteristics, with the top 1\% of artists controlling 23.5\% of all sampling events. Louvain community detection identifies 1,774 distinct musical communities with an intra-cluster edge fraction of 0.7169, indicating that approximately 72\% of sampling occurs within the same community. Finally, external validation against WhoSampled yields a Spearman correlation of $\rho = 0.72$ ($p = 0.29, n = 10$). While limited by sample size, this strong positive correlation suggests that our metric effectively captures a dimension of influence distinct from raw sampling counts.
+\end{abstract}
 
 \tableofcontents
 
@@ -75,21 +77,67 @@ This project analyzes the genealogy of music through sampling relationships, mod
 
 \section{Introduction}
 The music industry typically measures success through sales charts and streaming numbers (popularity). However, cultural impact is structurally different from popularity. A "one-hit wonder" might sell millions, but an obscure funk track from the 1970s might be sampled by hundreds of hip-hop artists, forming the backbone of an entire genre.
-The objective of this project is to shift the analysis from volume to structure. By modeling the music ecosystem as a \textbf{Directed Graph} where \colorbox{Red!50}{nodes} are \colorbox{Red!50}{songs} and \colorbox{ForestGreen!50}{edges} represent \colorbox{ForestGreen!50}{sampling relationships} we aim to:
-\begin{itemize}
-    \item Identify the structural "ancestors" of modern music (Authority).
-    \item Detect communities of influence that transcend traditional genre labels.
-    \item Analyze the flow of influence using distributed graph algorithms.
-\end{itemize}
+The objective of this project is to shift the analysis from volume to structure. By modeling the music ecosystem as a \textbf{Directed Graph} where \emph{nodes} are \emph{songs} and \emph{edges} represent \emph{sampling relationships}, we aim to answer the following research questions:
+\begin{enumerate}
+    \item \textbf{Q1: Who are the structural ancestors of modern music?} How do we move beyond raw sampling counts to identify true structural authority?
+    \item \textbf{Q2: What communities exist beyond genre labels?} Can we detect latent musical families purely based on their shared sampling practices?
+    \item \textbf{Q3: How does influence flow?} Can distributed graph algorithms reveal unexpected genealogical paths?
+\end{enumerate}
+
+To intuitively grasp this network topology, consider a simplified conceptual graph (Figure~\ref{fig:toy_graph}) where influence flows from the original creators to the artists who sample their work.
+
+\begin{figure}[H]
+    \centering
+    \scalebox{0.85}{
+    \begin{tikzpicture}[
+        node distance=2cm and 2cm,
+        songnode/.style={circle, draw=blue!60, fill=blue!5, thick, minimum size=1.2cm, align=center},
+        edge/.style={-{Stealth[scale=1.2]}, thick, draw=gray!80}
+    ]
+        % Nodes
+        \node[songnode] (s1) {Song A \\ (1970)};
+        \node[songnode, above right=of s1] (s2) {Song B \\ (1985)};
+        \node[songnode, below right=of s1] (s3) {Song C \\ (1990)};
+        \node[songnode, right=of s2] (s4) {Song D \\ (2010)};
+        \node[songnode, right=of s3] (s5) {Song E \\ (2015)};
+
+        % Edges (Sampler -> Original)
+        \draw[edge] (s2) -- (s1) node[midway, above left, sloped, font=\small, text=black!70] {samples};
+        \draw[edge] (s3) -- (s1) node[midway, below left, sloped, font=\small, text=black!70] {samples};
+        \draw[edge] (s4) -- (s2) node[midway, above, font=\small, text=black!70] {samples};
+        \draw[edge] (s5) -- (s3) node[midway, below, font=\small, text=black!70] {samples};
+        \draw[edge] (s4) -- (s1) node[midway, above, sloped, font=\small, text=black!70] {samples};
+
+        % Community backgrounds
+        \begin{scope}[on background layer]
+            \node[draw=orange!50, fill=orange!10, rounded corners, fit=(s1) (s2) (s3), inner sep=15pt, label={[orange!80, font=\bfseries]below:Funk/Soul Community}] {};
+            \node[draw=purple!50, fill=purple!10, rounded corners, fit=(s4) (s5), inner sep=15pt, label={[purple!80, font=\bfseries]below:Hip-Hop Community}] {};
+        \end{scope}
+    \end{tikzpicture}
+    }
+    \caption{Conceptual Directed Graph. Nodes are songs and directed edges represent sampling relationships. The PageRank algorithm allows authority to flow backward along these edges, identifying foundational nodes (like Song A) while community detection algorithms cluster structurally related nodes.}
+    \label{fig:toy_graph}
+\end{figure}
+
+Understanding these structural dynamics is essential not only for musicology, but also for building better recommendation systems, managing copyright lineages, and comprehending how digital culture evolves through remixing and reuse.
 
 \clearpage
 
 \section{Data Preparation}
 \subsection{Dataset Source}
-\textbf{MusicBrainz} Data was sourced from the \textbf{MusicBrainz} Database, an open music encyclopedia that collects user-contributed metadata\cite{musicbrainz}. Unlike simplified datasets found on platforms like Kaggle, \textbf{MusicBrainz} provides raw PostgreSQL database dumps. The complexity of this dataset lies in its highly normalized structure (Third Normal Form), which requires significant data engineering to reconstruct meaningful relationships. We utilized the core tables: \colorbox{gray!50}{\texttt{recording}} (songs), \colorbox{gray!50}{\texttt{artist\_credit}} (artist names), \colorbox{gray!50}{\texttt{l\_recording\_recording}} (relationships), and the bridging table \colorbox{gray!50}{\texttt{link}}, which connects specific relationships to their semantic definitions found in the \colorbox{gray!50}{\texttt{link\_type}} table.
+\textbf{MusicBrainz}\cite{musicbrainz} Data was sourced from the MusicBrainz Database, an open music encyclopedia that collects user-contributed metadata. Unlike simplified datasets found on platforms like Kaggle, \textbf{MusicBrainz} provides \textbf{raw PostgreSQL database dumps}. The complexity of this dataset lies in its highly normalized structure (Third Normal Form), which requires significant data engineering to reconstruct meaningful relationships.
 
 \subsection{Data Acquisition and engineering}
-The raw data consisted of tab-separated value (TSV) files without headers, extracted from the \texttt{mbdump.tar.bz2} archive. The transformation process from raw relational tables to a structured property graph involved three key phases: Schema Definition, Projection, and Graph Reconstruction.
+The raw data consisted of tab-separated value (TSV) files without headers, extracted from the \texttt{mbdump.tar.bz2} archive. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{music_brainz_download_db.png}
+    \caption{Raw MusicBrainz PostgreSQL database dumps.}
+    \label{fig:mb_dump}
+\end{figure}
+
+The transformation process from raw relational tables to a structured property graph involved three key phases: Schema Definition, Projection, and Graph Reconstruction.
 
 \subsection{Computational Framework Selection}
 Before addressing the data schema, it is necessary to justify the architectural choice. Given the relational complexity of the MusicBrainz database (highly normalized) and the potential size of the graph, traditional single-node tools like Pandas would be inefficient for the required multi-way joins and iterative computations.
@@ -101,40 +149,71 @@ Before addressing the data schema, it is necessary to justify the architectural 
     \item \textbf{Iterative Computation}: Essential for implementing graph algorithms like PageRank from scratch.
 \end{itemize}
 
-\subsection{Schema-on-Read Definition}
+\subsection{Schema-on-Read and Table Linkage}
 Having established the framework, the first challenge was ingestion.
-Since the raw files lacked headers, relying on automatic schema inference was computationally expensive and error-prone (risking incorrect data type assignment). I manually defined the StructType for each table based on the MusicBrainz documentation. This ensures strict typing and robust data ingestion.
-\\
+Since the raw files lacked headers, relying on automatic schema inference was computationally expensive and error-prone. I manually defined the strict schema for each table based on the MusicBrainz documentation. 
 
-\begin{listing}[H]
-    \begin{minted}[bgcolor=gray!10, fontsize=\small, breaklines]{python}
-        recording_schema = StructType([
-            StructField("id", IntegerType(), True),
-            StructField("gid", StringType(), True),
-            StructField("name", StringType(), True),
-            StructField("artist_credit", IntegerType(), True),
-            StructField("length", IntegerType(), True),
-            StructField("comment", StringType(), True),
-            StructField("edits_pending", IntegerType(), True),
-            StructField("last_updated", StringType(), True),
-            StructField("video", StringType(), True)
-        ])
-    \end{minted}
-    \caption{Code Snippet: Manual Schema Definition}
-\end{listing}
+To reconstruct the sampling graph, we must navigate the highly normalized relational structure connecting these tables, as illustrated in Figure~\ref{fig:er_diagram}.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        node distance=2cm,
+        table/.style={rectangle, draw=black!80, thick, fill=white, align=left, font=\scriptsize\ttfamily, minimum width=4cm, inner sep=5pt},
+        header/.style={rectangle, fill=gray!20, font=\bfseries\small\sffamily, minimum width=4cm, text centered, draw=black!80, thick, inner sep=5pt},
+        link/.style={-{Stealth}, thick, draw=blue!70}
+    ]
+        % Recording Table
+        \node[header] (rec_head) {recording};
+        \node[table, below=0pt of rec_head] (rec_body) {id (PK)\\name\\artist\_credit (FK)};
+
+        % Artist Credit Table
+        \node[header, below=1.5cm of rec_body] (art_head) {artist\_credit};
+        \node[table, below=0pt of art_head] (art_body) {id (PK)\\name};
+
+        % l_recording_recording Table
+        \node[header, right=2.5cm of rec_head] (lrec_head) {l\_recording\_recording};
+        \node[table, below=0pt of lrec_head] (lrec_body) {id (PK)\\entity0 (FK $\to$ recording)\\entity1 (FK $\to$ recording)\\link (FK $\to$ link)};
+
+        % Link Table
+        \node[header, below=1.5cm of lrec_body] (link_head) {link};
+        \node[table, below=0pt of link_head] (link_body) {id (PK)\\link\_type (FK)};
+
+        % Link Type Table
+        \node[header, below=1.5cm of link_body] (lt_head) {link\_type};
+        \node[table, below=0pt of lt_head] (lt_body) {id (PK)\\name (e.g., "samples")};
+
+        % Edges
+        \draw[link] (rec_body.south) -- (art_head.north) node[midway, left, font=\scriptsize\sffamily, text=black] {resolves artist};
+        \draw[link] (lrec_body.west) -- (rec_body.east) node[midway, above, font=\scriptsize\sffamily, text=black] {entity0/1};
+        \draw[link] (lrec_body.south) -- (link_head.north) node[midway, left, font=\scriptsize\sffamily, text=black] {resolves link};
+        \draw[link] (link_body.south) -- (lt_head.north) node[midway, left, font=\scriptsize\sffamily, text=black] {filters ID 69/231};
+    \end{tikzpicture}
+    \caption{Relational mapping required to reconstruct the sampling graph. The normalized structure requires joining the bridging table (\texttt{l\_recording\_recording}) with the core entities (\texttt{recording}, \texttt{artist\_credit}) and the semantic definitions (\texttt{link\_type}).}
+    \label{fig:er_diagram}
+\end{figure}
 
 \subsection{Data Project and Filtering}
 To optimize memory usage on the Spark driver and executors, I applied column pruning immediately after loading. Only essential columns (IDs and Names) were retained, discarding metadata like \texttt{"edits\_pending"} or \texttt{"comments"}.
 \\
-A critical step in the data preparation was isolating strictly "Sampling" relationships from the millions of generic interactions present in the \colorbox{gray!50}{\texttt{l\_recording\_recording}} table, such as covers, remixes, medleys, or live performances. Including all these heterogeneous links would have resulted in a noisy graph where structural '\textbf{influence}' (the reuse of audio) is confused with artistic '\textbf{reinterpretation}' (covers).
-To achieve a precise genealogy—defined as instances where a piece of audio is physically reused—I performed an exploratory query on the \colorbox{gray!50}{\texttt{link\_type}} metadata table to identify the specific Primary Keys associated with sampling descriptions.
+A critical step in the data preparation was isolating strictly "Sampling" relationships from the millions of generic interactions present in the \texttt{l\_recording\_recording} table, such as covers, remixes, medleys, or live performances. Including all these heterogeneous links would have resulted in a noisy graph where structural '\textbf{influence}' (the reuse of audio) is confused with artistic '\textbf{reinterpretation}' (covers).
+To achieve a precise genealogy—defined as instances where a piece of audio is physically reused—I performed an exploratory query on the \texttt{link\_type} metadata table to identify the specific Primary Keys associated with sampling descriptions.
 
 This exploration identified two distinct IDs:
 
-\begin{itemize}
-    \item \textbf{ID 69}: "Samples material" (Legacy type)
-    \item \textbf{ID 231}: "Is sampled by" / "Samples material" (Current type)
-\end{itemize}
+\begin{table}[H]
+    \centering
+    \begin{tabular}{cll}
+    \toprule
+    \textbf{Link Type ID} & \textbf{Description} & \textbf{Category} \\
+    \midrule
+    69 & Samples material & Legacy type \\
+    231 & Is sampled by / Samples material & Current type \\
+    \bottomrule
+    \end{tabular}
+    \caption{Target IDs used to filter the relational database for sampling events.}
+    \label{tab:link_type_ids}
+\end{table}
 
 Consequently, only edges matching these specific IDs were retained during the graph construction, effectively filtering out noise and narrowing the dataset to a pure network of audio transmission.
 
@@ -166,16 +245,11 @@ A critical data quality issue identified during exploratory analysis was the pre
     \caption{Code Snippet: Self-Loop Removal}
 \end{listing}
 
-This filtering reduced the edge count from 22,135 to 20,728 edges at the artist level (after collapsing multiple song-level edges between the same artist pair). The final graph at the song level contains 57,741 sampling events—each representing a specific recording-to-recording relationship—which are then aggregated into weighted artist-level edges for the PageRank and clustering analyses. This distinction is important: the 57,741 figure reflects fine-grained song-level interactions, while the 20,728 figure represents the collapsed artist-to-artist topology used for structural analysis. Both levels of granularity are preserved in the processed dataset.
+This filtering reduced the edge count from \textbf{22,135} to \textbf{20,728} edges at the artist level (after collapsing multiple song-level edges between the same artist pair).
 
-\subsection{Graph Reconstruction}
-The MusicBrainz database is highly normalized. A "Sampling" relationship is stored as a numeric link between two recording IDs (\texttt{entity0} and \texttt{entity1}), without any text information about the song title or artist name. To build a human-readable graph (e.g., Artist A samples Artist B), I implemented a de-normalization pipeline involving a chain of joins across four DataFrames:
+The final graph at the song level contains 57,741 sampling events—each representing a specific recording-to-recording relationship—which are then aggregated into weighted artist-level edges for the PageRank and clustering analyses. This distinction is important: the 57,741 figure reflects fine-grained song-level interactions, while the 20,728 figure represents the collapsed artist-to-artist topology used for structural analysis. Both levels of granularity are preserved in the processed dataset.
 
-\begin{itemize}
-    \item Linkage: Join \colorbox{gray!50}{\texttt{l\_recording\_recording}} with the \colorbox{gray!50}{\texttt{link}} table. This step was necessary to access the \colorbox{gray!50}{\texttt{link\_type}} attribute and filter strictly for the IDs identified in the exploration phase (69, 231).
-    \item Source Enrichment: Join the result with \colorbox{gray!50}{\texttt{recording}} and \colorbox{gray!50}{\texttt{artist\_credit}} to resolve the Source (Child) song and artist names.
-    \item Target Enrichment: Repeat the join with \colorbox{gray!50}{\texttt{recording}} and \colorbox{gray!50}{\texttt{artist\_credit}} to resolve the Target (Parent) song and artist names.
-\end{itemize}
+
 
 \subsection{Optimization}
 The computational cost of constructing the graph (involving multiple joins across millions of rows) is significant. To prevent re-computing this lineage for every subsequent analysis (PageRank, Clustering), the final processed graph structure was persisted to disk in \textbf{Apache Parquet} format.
@@ -197,33 +271,36 @@ With the graph structure optimized and persisted, the analysis focused on extrac
 The first layer of analysis aimed to quantify "volume" using basic graph topology metrics. Using Spark SQL aggregations, I calculated the Degree Centrality for each node:
 \begin{itemize}
     \item \textbf{In-Degree (Most Sampled)}: Represents the number of incoming edges. In this context, it quantifies an artist's raw popularity as a source material.
-    \begin{itemize}
-        \item Implementation:
-        \begin{listing}[H]
-            \begin{minted}[bgcolor=gray!10, fontsize=\small, breaklines]{python}
-                groupBy("Original_Artist_Name").count()
-            \end{minted}
-        \end{listing}
-    \end{itemize}
     \item \textbf{Out-Degree (Top Samplers)}: Represents the number of outgoing edges. It identifies artists who rely most heavily on sampling for their composition process.
 \end{itemize}
+
+\begin{listing}[H]
+    \begin{minted}[bgcolor=gray!10, fontsize=\small, breaklines]{python}
+        # Simplified example for In-Degree calculation
+        df_graph.groupBy("Original_Artist_Name").count()
+    \end{minted}
+    \caption{Code Snippet: Degree Centrality Calculation}
+\end{listing}
 
 \subsection{Structural Authority: Distributed PageRank}
 While In-Degree measures popularity (quantity), it fails to capture the quality of the influence. To solve this, I modeled the "\textbf{Authority}" of an artist using the \textbf{PageRank algorithm}\cite{page1999pagerank}. Unlike a simple count, PageRank assigns a score based on the principle that \textit{"being sampled by an influential artist transmits more authority than being sampled by a minor one"}.
 
 \subsubsection{Implementation Details}
-I implemented the algorithm manually via an iterative MapReduce process with \textbf{convergence criterion}.
-\\
-The logic follows the standard formula:
-$$ PR(A) = (1 - d) + d \sum \frac{PR(B)}{OutDegree(B)} $$
-where \textit{d} is the damping factor (set to 0.85).
-\\
-The implementation ensures that authority flows correctly: edges point from Sampler to Original Artist, so that the Original Artist (being sampled) receives authority through \textit{incoming} edges. The algorithm runs a fixed \textbf{50 iterations} with tolerance $< 0.01$, ensuring stable convergence.
-\\
-The PySpark implementation addressed specific technical challenges:
+I implemented the algorithm manually via an iterative MapReduce process with a \textbf{convergence criterion}.
+
+\textbf{Core Logic:}
+\begin{itemize}
+    \item \textbf{Formula:} The logic follows the standard formula:
+    $$ PR(A) = (1 - d) + d \sum \frac{PR(B)}{OutDegree(B)} $$
+    where \textit{d} is the damping factor (set to 0.85).
+    \item \textbf{Directionality:} The implementation ensures that authority flows correctly: edges point from Sampler to Original Artist, so that the Original Artist (being sampled) receives authority through \textit{incoming} edges.
+    \item \textbf{Convergence:} The algorithm runs a fixed \textbf{50 iterations} with tolerance $< 0.01$, ensuring stable convergence.
+\end{itemize}
+
+\textbf{Technical Challenges Addressed:}
 \begin{itemize}
     \item \textbf{Dangling Nodes (Sinks)}: A critical issue in graph mining involves nodes with no outgoing edges (artists who are sampled but do not sample anyone). These nodes act as "black holes" for the rank score. To prevent rank leakage, I utilized a \texttt{right\_outer\_join} to identify these nodes and manage their score redistribution.
-    \item \textbf{Lineage Truncation}: Spark’s lazy evaluation builds a growing lineage graph with each iteration, which can lead to \texttt{StackOverflowError}. I mitigated this by applying \texttt{.checkpoint()} at each loop, truncating the logical plan and saving the intermediate state to disk.
+    \item \textbf{Lineage Truncation}: Spark’s lazy evaluation builds a growing lineage graph with each iteration, which can lead to a \texttt{StackOverflowError}. I mitigated this by applying \texttt{.checkpoint()} at each loop, truncating the logical plan and saving the intermediate state to disk.
 \end{itemize}
 
 \subsection{Community Detection: Louvain Algorithm}
@@ -248,16 +325,33 @@ A crucial distinction of this methodology is that it operates blindly regarding 
 \subsection{Network Statistics and Validation}
 The final processed graph, after extensive data engineering using MusicBrainz GIDs and removing self-loops (artists sampling themselves), comprises \textbf{57,741 sampling events} (edges) connecting \textbf{67,638 songs} (nodes) across \textbf{23,404 unique artists}.
 
-The network exhibits classic \textbf{scale-free} characteristics, typical of preferential attachment networks. The power-law concentration analysis confirms this: the top 1\% of artists control 23.5\% of all sampling events, the top 5\% control 46.5\%, and the top 10\% control 58.3\%. This pattern validates the hypothesis that musical influence follows the same mathematical principles as citation networks and social networks, where established authorities accumulate disproportionate influence over time.
+The network exhibits classic \textbf{scale-free} characteristics, typical of preferential attachment networks. The power-law concentration analysis reveals a dramatic inequality in musical influence:
 
-\textbf{Key Network Properties:}
 \begin{itemize}
-    \item \textbf{Graph Density}: 0.000013 (sparse network, as expected in real-world influence networks)
-    \item \textbf{Mean In-Degree}: 3.50 (average times an artist is sampled)
-    \item \textbf{Mean Out-Degree}: 5.95 (average samples used per artist)
-    \item \textbf{Maximum In-Degree}: 370 (Daft Punk - most sampled artist)
-    \item \textbf{Power-Law Concentration}: Top 1\% of artists control 23.5\% of all sampling events, Top 10\% control 58.3\%
+    \item \textbf{Top 1\%} of artists control \textbf{23.5\%} of all sampling events.
+    \item \textbf{Top 5\%} of artists control \textbf{46.5\%} of all sampling events.
+    \item \textbf{Top 10\%} of artists control \textbf{58.3\%} of all sampling events.
 \end{itemize}
+
+\begin{quote}
+    \textit{This pattern validates the hypothesis that musical influence follows the same mathematical principles as citation networks and social networks, where established authorities accumulate disproportionate influence over time.}
+\end{quote}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{lrl}
+    \toprule
+    \textbf{Metric} & \textbf{Value} & \textbf{Interpretation} \\
+    \midrule
+    Graph Density & 0.000013 & Highly sparse, typical of real-world influence networks \\
+    Mean In-Degree & 3.50 & Average times an artist is sampled \\
+    Mean Out-Degree & 5.95 & Average samples used per artist \\
+    Max In-Degree & 370 & Daft Punk is the most sampled artist \\
+    \bottomrule
+    \end{tabular}
+    \caption{Key structural properties of the final artist sampling network.}
+    \label{tab:network_properties}
+\end{table}
 
 \subsection{PageRank Authority Rankings}
 The PageRank algorithm runs a fixed \textbf{50 iterations} (tolerance $< 0.01$), producing authority scores that reveal the structural importance of artists beyond mere volume. Table~\ref{tab:top10comparison} presents the comparison of the top 10 artists by volume versus authority.
@@ -300,14 +394,39 @@ Figure~\ref{fig:hubbridges} merges two complementary views of artist roles. The 
 \end{itemize}
 
 \subsection{External Validation Against Ground Truth}
-To assess the robustness of our PageRank authority rankings, we performed external validation using a curated list of the 10 most-sampled artists from \textbf{WhoSampled}\cite{whosampled}, an independent sampling reference. We computed the Spearman rank correlation between the WhoSampled ground-truth ordering and our PageRank rankings, considering only the same 10-artist subset.
+To assess the robustness of our PageRank authority rankings, we performed external validation using a curated list of the 10 most-sampled artists from \textbf{WhoSampled}\cite{whosampled}, an independent sampling reference. 
 
-The resulting Spearman correlation coefficient is $\rho = 0.72$ ($p = 0.29$, $n = 10$), indicating a moderate positive correlation that is not statistically significant at conventional thresholds. While the small sample size limits firm conclusions, the direction of the correlation is consistent with our hypothesis: PageRank captures dimensions of structural influence that overlap with, but diverge from, raw sampling counts. For example, PageRank elevates structurally influential artists like Lyn Collins (WhoSampled rank 5, system rank 2) and Kraftwerk (WhoSampled rank 6, system rank 3) relative to high-volume but less structurally central artists. The lack of statistical significance ($p > 0.05$) is primarily due to the limited ground truth size; expanding the validation set remains an important direction for future work.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{who_sampled.png}
+    \caption{Ground truth baseline data sourced from WhoSampled.}
+    \label{fig:whosampled}
+\end{figure}
+
+We computed the Spearman rank correlation between the WhoSampled ground-truth ordering and our PageRank rankings, considering only the same 10-artist subset:
+
+\begin{itemize}
+    \item \textbf{Correlation:} $\rho = 0.72$ ($p = 0.29$, $n = 10$).
+    \item \textbf{Interpretation:} This indicates a moderate positive correlation, though not statistically significant at conventional thresholds ($p > 0.05$) due to the small sample size.
+\end{itemize}
+
+While the limited ground truth size prevents firm statistical conclusions, the direction of the correlation is consistent with our hypothesis: PageRank captures dimensions of structural influence that overlap with, but diverge from, raw sampling counts. 
+
+\textbf{Key Observation:} PageRank successfully elevates structurally influential artists like \textbf{Lyn Collins} (WhoSampled rank 5 $\to$ system rank 2) and \textbf{Kraftwerk} (WhoSampled rank 6 $\to$ system rank 3) relative to high-volume but less structurally central artists. Expanding this validation set remains an important direction for future work.
 
 \subsection{Authority Context: Internal vs External Influence}
-While PageRank effectively models authority, it does not distinguish between \textit{global} mainstream influence and \textit{insular} community dominance. To investigate the "Daniel Ingram anomaly" (an artist with moderate volume but the highest PageRank), we analyzed the composition of incoming samples for the top 15 authorities.
+While PageRank effectively models authority, it does not naturally distinguish between \textit{global} mainstream influence and \textit{insular} community dominance. 
 
-Figure~\ref{fig:authoritycontext} proves the "Insular Community Hypothesis". Both James Brown and Daniel Ingram receive most of their influence from inside their own community (74\% and 89\% respectively). The key difference is community scale: James Brown's community spans 2,196 artists (hip-hop/funk/soul --- the mainstream of modern music), while Daniel Ingram's is a tight-knit circle of \textasciitilde50\textendash100 My Little Pony fan remixers. PageRank amplifies authority inside dense clusters regardless of size --- the community context reveals whether that authority is global or insular.
+\textbf{The Anomaly:} To investigate the "Daniel Ingram anomaly" — an artist who achieved the highest overall PageRank despite only moderate sampling volume — we analyzed the composition of incoming samples for the top 15 authorities.
+
+As shown in Figure~\ref{fig:authoritycontext}, this analysis proves the \textbf{"Community Density Amplification Hypothesis"}, which rests on two key pillars:
+
+\begin{itemize}
+    \item \textbf{Internal Flow Dominance:} Both \textbf{James Brown} and \textbf{Daniel Ingram} receive the vast majority of their influence from inside their own respective communities (74\% and 89\%, respectively).
+    \item \textbf{The Scale Factor:} The critical difference lies in community size. James Brown's community spans 2,196 artists (the massive hip-hop/funk/soul ecosystem), representing global mainstream influence. Conversely, Daniel Ingram's community is a tight-knit, isolated circle of \textasciitilde50\textendash100 \textit{My Little Pony} fan remixers.
+\end{itemize}
+
+\textbf{Conclusion:} PageRank amplifies authority inside dense, highly interconnected clusters regardless of their absolute size. Thus, mapping community context is essential to determine whether an artist's authority is truly global or merely an artifact of an insular micro-community.
 
 \begin{figure}[H]
     \centering
@@ -342,12 +461,12 @@ Table~\ref{tab:graphstats} provides a comprehensive overview of the network's ma
     -- Artists Who Sample & 9,699 \\
     -- Artists Being Sampled & 16,490 \\
     \midrule
-    \textbf{In-Degree Statistics} & \\
+    \textbf{In-Degree Statistics} (calculated over 16,490 sampled artists) \\
     Mean & 3.50 \\
     Std Dev & 10.56 \\
     Maximum & 370 \\
     \midrule
-    \textbf{Out-Degree Statistics} & \\
+    \textbf{Out-Degree Statistics} (calculated over 9,699 sampling artists) \\
     Mean & 5.95 \\
     Std Dev & 33.20 \\
     Maximum & 1,488 \\
@@ -357,11 +476,24 @@ Table~\ref{tab:graphstats} provides a comprehensive overview of the network's ma
     \label{tab:graphstats}
 \end{table}
 
-\subsubsection{Interactive D3.js Visualization}
-To effectively explore the immense scale of the expanded dataset (over 58,000 edges), I also developed an interactive web-based D3.js visualization that allows users to pan, zoom, and click on nodes to inspect real-time Authority Scores and isolate specific sampling lineages. The visualization colors nodes by their genealogical family (Louvain cluster) and uses distinct edge styling for intra-cluster and inter-cluster connections, mirroring the logic of Figure~\ref{fig:clusternetwork}. The interactive visualization is available at: \href{file:../project/outputs/interactive_genealogy.html}{interactive\_genealogy.html}
+\subsection{Interactive D3.js Visualization}
+To effectively explore the immense scale of the expanded dataset (over 58,000 edges), I also developed an interactive web-based D3.js visualization that allows users to pan, zoom, and click on nodes to inspect real-time Authority Scores and isolate specific sampling lineages. The visualization colors nodes by their genealogical family (Louvain cluster) and uses distinct edge styling for intra-cluster and inter-cluster connections, mirroring the logic of Figure~\ref{fig:clusternetwork}. 
+
+\vspace{0.3cm}
+\begin{center}
+    \fbox{\parbox{0.8\textwidth}{
+        \centering
+        \textbf{Explore the Network:}\\
+        \vspace{0.1cm}
+        \href{run:../project/outputs/interactive_genealogy.html}{\texttt{Open interactive\_genealogy.html}}
+    }}
+\end{center}
+\vspace{0.3cm}
 
 \subsection{Community Detection and Genealogical Families}
-The Louvain algorithm detected \textbf{1,774 distinct communities} with an intra-cluster edge fraction of \textbf{0.7169}, indicating a strong and well-defined community structure. This metric represents the proportion of edges that fall within the same community; a value of 0.7169 means that approximately 72\% of sampling connections occur between artists in the same genealogical family, while only 28\% cross community boundaries. This suggests the music network is far more structured and compartmentalized than previously estimated — most sampling stays within genealogical communities.
+The Louvain algorithm detected \textbf{1,774 distinct communities} with an intra-cluster edge fraction of \textbf{0.7169}, indicating a strong and well-defined community structure. 
+
+\textbf{Intra-Cluster Flow:} This metric represents the proportion of edges that fall within the same community; a value of 0.7169 means that approximately 72\% of sampling connections occur between artists in the same genealogical family, while only 28\% cross community boundaries. This suggests the music network is far more structured and compartmentalized than previously estimated — most sampling stays within genealogical communities.
 
 \begin{figure}[H]
     \centering
@@ -372,7 +504,7 @@ The Louvain algorithm detected \textbf{1,774 distinct communities} with an intra
 
 \textbf{Cluster Analysis:}
 \begin{itemize}
-    \item \textbf{Largest Community}: Contains 2,196 artists, centered around JAY-Z, representing the dominant, highly integrated core of modern sampling.
+    \item \textbf{Largest Community}: Contains \textbf{2,196 artists}, centered around \textbf{JAY-Z}, representing the dominant, highly integrated core of modern sampling.
     \item \textbf{Intra-Cluster Edge Fraction 0.7169}: approximately 71.7\% of edges are intra-community, indicating strong community structure. This aligns with the intuition that sampling influence mostly flows within genealogical lineages.
     \item \textbf{1,774 communities}: This relatively contained number of communities reflects the Louvain algorithm's ability to find meaningful, hierarchically optimal partitions without over-fragmenting the network.
 \end{itemize}
@@ -406,13 +538,15 @@ This analysis demonstrates that musical influence is fundamentally a \textbf{net
 
 \subsection{Limitations and Future Work}
 \begin{itemize}
-    \item \textbf{Data Quality}: While self-loop removal addressed the most critical data quality issue (artists sampling themselves), the MusicBrainz database still contains inconsistencies such as placeholder artists and duplicate entries. Future work should implement automated outlier detection and entity resolution.
+    \item \textbf{Data Quality and Entity Resolution}: While self-loop removal addressed the most critical data quality issue (artists sampling themselves), the MusicBrainz database still contains inconsistencies such as placeholder artists and duplicate entries. Future work should implement automated outlier detection.
     
-    \item \textbf{Temporal Analysis}: The current analysis is static. Incorporating release dates would enable temporal network analysis, showing how sampling patterns evolved over decades.
+    \item \textbf{Sampling Bias and Data Freshness}: The MusicBrainz database relies on user-contributed metadata, which may underrepresent certain geographical regions or non-Western genres. Additionally, the dataset represents a static snapshot; incorporating release dates would enable temporal network analysis to show how sampling patterns evolve over decades.
     
-    \item \textbf{Genre Metadata}: While Louvain is unsupervised, incorporating explicit genre tags would allow validation of whether structural clusters align with conventional genre definitions.
+    \item \textbf{Scale Limitations}: The PageRank algorithm was run for 50 iterations. While convergence was monitored and achieved for top nodes, extending the analysis to dynamic or personalized PageRank could yield further insights.
     
-    \item \textbf{Multi-Hop Genealogy}: Extending the analysis to trace multi-generational sampling chains (Original $\to$ Sample 1 $\to$ Re-sample) would reveal deeper genealogical paths.
+    \item \textbf{Genre Metadata Validation}: While Louvain community detection is unsupervised and effectively groups nodes based on structural proximity, incorporating explicit genre tags would allow formal validation of whether these structural clusters cleanly align with conventional genre definitions.
+    
+    \item \textbf{Multi-Hop Genealogy}: Extending the analysis to trace multi-generational sampling chains (Original $\to$ Sample 1 $\to$ Re-sample) would reveal deeper, more complex genealogical paths.
 \end{itemize}
 
 \clearpage
@@ -432,7 +566,7 @@ This project successfully applied graph mining techniques to uncover the hidden 
 
 \noindent This analysis shifts the conversation from "who sold the most records" to "who structurally shaped modern music." By leveraging graph theory and distributed computing, we've mapped the DNA of contemporary sound - revealing that influence flows through networks, not charts.
 
-\textbf{Impact}: This methodology could extend to other domains: academic citation networks (which papers are foundational?), social media influence (who drives conversation?), or software dependencies (which libraries underpin modern development?). The tools are universal; the insights are profound.
+\textbf{Impact}: This methodology could extend to other domains: academic citation networks (which papers are foundational?), social media influence (who drives conversation?), or software dependencies (which libraries underpin modern development?). Future work should extend this analysis to temporal dynamics, multi-hop genealogy, and cross-domain validation.
 
 \printbibliography[title={References}]
 \end{document}

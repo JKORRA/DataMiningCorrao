@@ -8,6 +8,7 @@
 
 # MusicBrainz database dumps (too large, must be downloaded separately)
 dataset/mbdump/
+project/mbdump/
 
 # Generated Parquet files (can be regenerated)
 dataset/outputs/*.parquet/
@@ -17,6 +18,7 @@ dataset/outputs/**/*.parquet
 
 # CSV outputs (regenerable)
 dataset/outputs/*.csv
+project/outputs/*.csv
 !dataset/outputs/README.md  # Keep README explaining how to regenerate
 
 # ============================================
@@ -27,6 +29,9 @@ dataset/outputs/*.csv
 dataset/checkpoints/
 dataset/checkpoints_clustering/
 dataset/checkpoints_viz/
+project/checkpoints/
+project/checkpoints_clustering/
+project/checkpoints_viz/
 
 # Python virtual environment
 dataset/venv/
@@ -66,8 +71,16 @@ report/*.nav
 report/*.snm
 report/*.vrb
 
+# Spark CRC temp files
+*.crc
+
+# Experimental/sidecar files
+*_head
+*_tail
+
 # Minted cache
 report/_minted-*/
+report/_minted/
 
 # ============================================
 # GENERATED FIGURES (OPTIONAL - CHOOSE ONE)
