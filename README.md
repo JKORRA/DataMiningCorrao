@@ -309,4 +309,4 @@ The `fig4_cluster_artist_network` visualization shows the top 50 artists by Page
 
 ---
 
-**Last Updated**: 20 May 2026
+**Last Updated**: 18 Jun. 2026
