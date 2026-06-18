@@ -1,3 +1,18 @@
+"""
+External Validation against Ground Truth
+
+This script validates the PageRank authority scores against an external "ground truth"
+ranking (the Top 30 most sampled artists according to WhoSampled.com consensus).
+
+The pipeline performs the following steps:
+1. Loads the computed PageRank authority scores.
+2. Defines the ground truth ranking of the top 30 influential artists.
+3. Uses fuzzy string matching to align ground truth names with our dataset's normalized names.
+4. Computes the Spearman Rank Correlation Coefficient to statistically validate 
+   if our structural graph metric (PageRank) aligns with human consensus.
+5. Exports the match results and statistical significance metrics.
+"""
+
 from pyspark.sql import SparkSession
 import pandas as pd
 from scipy.stats import spearmanr
@@ -60,6 +75,8 @@ ground_truth = [
 gt_df = pd.DataFrame({"artist": ground_truth, "ground_truth_rank": range(1, 31)})
 
 # Fuzzy merge and calculate Spearman Rank Correlation
+# Because MusicBrainz string normalization might differ slightly from the ground truth
+# strings, we use fuzzy matching to map the lists.
 merged_data = []
 matched_indices = set()
 
@@ -105,6 +122,8 @@ else:
     print("No matches found.")
 
 if len(merged) > 1:
+    # Spearman rank correlation evaluates how well the relationship between two variables 
+    # can be described using a monotonic function. Perfect agreement = 1.0.
     correlation, p_value = spearmanr(merged["ground_truth_rank"], merged["system_rank"])
     print(f"\nSpearman Rank Correlation Coefficient: {correlation:.4f}")
     print(f"P-value: {p_value:.4f}")

@@ -1,6 +1,13 @@
 """
-Music Genealogy Analysis
-Analyzes the music sampling graph to identify influential artists and patterns.
+Degree Centrality Analysis
+
+This script analyzes the pre-processed music sampling graph to identify
+influential artists using basic network degree centrality metrics.
+
+The pipeline performs the following:
+1. Calculates In-Degree Centrality (most sampled artists).
+2. Calculates Out-Degree Centrality (artists who sample the most).
+3. Identifies the specific individual songs that have been sampled the most.
 """
 
 from pyspark.sql import SparkSession
@@ -14,6 +21,7 @@ df = spark.read.parquet("outputs/music_graph.parquet")
 df.cache()
 
 # Most influential artists (In-Degree Centrality)
+# High In-Degree indicates artists whose work serves as foundational material for others.
 print("\n--- TOP 20 MOST SAMPLED ARTISTS ---")
 print("These artists are the most influential through being sampled by others")
 
@@ -24,6 +32,7 @@ top_sampled = df.filter(col("Original_Artist_Name") != "[unknown]").groupBy("Ori
 top_sampled.show(20, truncate=False)
 
 # Serial samplers (Out-Degree Centrality)
+# High Out-Degree indicates prolific use of sampling, typical of electronic producers and DJs.
 print("\n--- TOP 20 SERIAL SAMPLERS ---")
 print("These artists use the most samples in their work (DJs and Producers)")
 

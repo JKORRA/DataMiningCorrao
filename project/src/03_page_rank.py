@@ -1,3 +1,18 @@
+"""
+Manual PageRank Authority Computation
+
+This script implements a distributed PageRank algorithm from scratch using PySpark
+DataFrames. It computes the structural "authority" of each artist in the network
+based on the music sampling graph.
+
+The pipeline performs the following steps:
+1. Loads the pre-processed sampling graph.
+2. Collapses song-level sampling edges into an aggregated artist-level weighted graph.
+3. Initializes the PageRank algorithm, pre-computing out-degrees and identifying sink nodes.
+4. Iteratively computes the PageRank scores, handling damping, teleports, and sink mass redistribution.
+5. Checks for convergence at each step and saves the final authority scores.
+"""
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, lit, sum as _sum, count, when, abs as _abs, max as _max_fn, broadcast
 
@@ -61,6 +76,8 @@ for i in range(MAX_ITERATIONS):
     old_ranks = ranks
     
     # Calculate mass from dangling nodes (sinks)
+    # Sink nodes have no outgoing edges, so their PageRank mass would be lost.
+    # We sum their rank and redistribute it evenly across all nodes in the network.
     sink_total_row = ranks.join(broadcast(sinks), "id").agg(_sum("rank").alias("sum")).collect()[0]
     sink_total = sink_total_row["sum"] if sink_total_row["sum"] is not None else 0.0
     
@@ -84,6 +101,7 @@ for i in range(MAX_ITERATIONS):
     )
     
     # Handle nodes with no incoming edges (they only get teleport mass)
+    # A left outer join ensures nodes with 0 incoming contributions still exist in the graph.
     ranks = nodes.join(ranks_calculated, "id", "left_outer") \
         .select(
             col("id"),
@@ -93,6 +111,7 @@ for i in range(MAX_ITERATIONS):
     ranks = ranks.checkpoint()
     
     # Check convergence
+    # Calculates the maximum absolute difference between the old rank and the newly computed rank.
     diff_check = ranks.join(broadcast(old_ranks.select(col("id"), col("rank").alias("old_rank"))), "id") \
         .select(_abs(col("rank") - col("old_rank")).alias("abs_diff"))
     

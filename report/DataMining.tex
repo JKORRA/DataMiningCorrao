@@ -151,7 +151,7 @@ Before addressing the data schema, it is necessary to justify the architectural 
 
 \subsection{Schema-on-Read and Table Linkage}
 Having established the framework, the first challenge was ingestion.
-Since the raw files lacked headers, relying on automatic schema inference was computationally expensive and error-prone. I manually defined the strict schema for each table based on the MusicBrainz documentation. 
+Since the raw files lacked headers, relying on automatic schema inference was computationally expensive and error-prone. The strict schema for each table was manually defined based on the MusicBrainz documentation. 
 
 To reconstruct the sampling graph, we must navigate the highly normalized relational structure connecting these tables, as illustrated in Figure~\ref{fig:er_diagram}.
 
@@ -194,10 +194,10 @@ To reconstruct the sampling graph, we must navigate the highly normalized relati
 \end{figure}
 
 \subsection{Data Project and Filtering}
-To optimize memory usage on the Spark driver and executors, I applied column pruning immediately after loading. Only essential columns (IDs and Names) were retained, discarding metadata like \texttt{"edits\_pending"} or \texttt{"comments"}.
+To optimize memory usage on the Spark driver and executors, column pruning was applied immediately after loading. Only essential columns (IDs and Names) were retained, discarding metadata like \texttt{"edits\_pending"} or \texttt{"comments"}.
 \\
 A critical step in the data preparation was isolating strictly "Sampling" relationships from the millions of generic interactions present in the \texttt{l\_recording\_recording} table, such as covers, remixes, medleys, or live performances. Including all these heterogeneous links would have resulted in a noisy graph where structural '\textbf{influence}' (the reuse of audio) is confused with artistic '\textbf{reinterpretation}' (covers).
-To achieve a precise genealogy—defined as instances where a piece of audio is physically reused—I performed an exploratory query on the \texttt{link\_type} metadata table to identify the specific Primary Keys associated with sampling descriptions.
+To achieve a precise genealogy—defined as instances where a piece of audio is physically reused—an exploratory query was performed on the \texttt{link\_type} metadata table to identify the specific Primary Keys associated with sampling descriptions.
 
 This exploration identified two distinct IDs:
 
@@ -265,10 +265,10 @@ This choice provides three critical advantages over traditional CSV storage:
 \clearpage
 
 \section{Methodology and Algorithms}
-With the graph structure optimized and persisted, the analysis focused on extracting knowledge through three distinct layers of complexity: \textbf{descriptive statistics}, \textbf{structural authority analysis} (PageRank), and \textbf{community detection} (Clustering). Crucially, to fully leverage the distributed nature of Spark and demonstrate a deep understanding of graph theory, I implemented the iterative graph algorithms from scratch using \texttt{PySpark} transformations (MapReduce paradigm) rather than relying on pre-built libraries like \texttt{GraphFrames}.
+With the graph structure optimized and persisted, the analysis focused on extracting knowledge through three distinct layers of complexity: \textbf{descriptive statistics}, \textbf{structural authority analysis} (PageRank), and \textbf{community detection} (Clustering). To fully leverage the distributed nature of Spark, the iterative graph algorithms were implemented from scratch using \texttt{PySpark} transformations (MapReduce paradigm) rather than relying on pre-built libraries like \texttt{GraphFrames}.
 
 \subsection{Descriptive Network Analysis: Degree Centrality}
-The first layer of analysis aimed to quantify "volume" using basic graph topology metrics. Using Spark SQL aggregations, I calculated the Degree Centrality for each node:
+The first layer of analysis aimed to quantify "volume" using basic graph topology metrics. Using Spark SQL aggregations, the Degree Centrality was calculated for each node:
 \begin{itemize}
     \item \textbf{In-Degree (Most Sampled)}: Represents the number of incoming edges. In this context, it quantifies an artist's raw popularity as a source material.
     \item \textbf{Out-Degree (Top Samplers)}: Represents the number of outgoing edges. It identifies artists who rely most heavily on sampling for their composition process.
@@ -283,10 +283,10 @@ The first layer of analysis aimed to quantify "volume" using basic graph topolog
 \end{listing}
 
 \subsection{Structural Authority: Distributed PageRank}
-While In-Degree measures popularity (quantity), it fails to capture the quality of the influence. To solve this, I modeled the "\textbf{Authority}" of an artist using the \textbf{PageRank algorithm}\cite{page1999pagerank}. Unlike a simple count, PageRank assigns a score based on the principle that \textit{"being sampled by an influential artist transmits more authority than being sampled by a minor one"}.
+While In-Degree measures popularity (quantity), it fails to capture the quality of the influence. To solve this, the "\textbf{Authority}" of an artist was modeled using the \textbf{PageRank algorithm}\cite{page1999pagerank}. Unlike a simple count, PageRank assigns a score based on the principle that \textit{"being sampled by an influential artist transmits more authority than being sampled by a minor one"}.
 
 \subsubsection{Implementation Details}
-I implemented the algorithm manually via an iterative MapReduce process with a \textbf{convergence criterion}.
+The algorithm was implemented manually via an iterative MapReduce process with a \textbf{convergence criterion}.
 
 \textbf{Core Logic:}
 \begin{itemize}
@@ -299,8 +299,8 @@ I implemented the algorithm manually via an iterative MapReduce process with a \
 
 \textbf{Technical Challenges Addressed:}
 \begin{itemize}
-    \item \textbf{Dangling Nodes (Sinks)}: A critical issue in graph mining involves nodes with no outgoing edges (artists who are sampled but do not sample anyone). These nodes act as "black holes" for the rank score. To prevent rank leakage, I utilized a \texttt{right\_outer\_join} to identify these nodes and manage their score redistribution.
-    \item \textbf{Lineage Truncation}: Spark’s lazy evaluation builds a growing lineage graph with each iteration, which can lead to a \texttt{StackOverflowError}. I mitigated this by applying \texttt{.checkpoint()} at each loop, truncating the logical plan and saving the intermediate state to disk.
+    \item \textbf{Dangling Nodes (Sinks)}: A critical issue in graph mining involves nodes with no outgoing edges (artists who are sampled but do not sample anyone). These nodes act as "black holes" for the rank score. To prevent rank leakage, a \texttt{right\_outer\_join} was utilized to identify these nodes and manage their score redistribution.
+    \item \textbf{Lineage Truncation}: Spark’s lazy evaluation builds a growing lineage graph with each iteration, which can lead to a \texttt{StackOverflowError}. This was mitigated by applying \texttt{.checkpoint()} at each loop, truncating the logical plan and saving the intermediate state to disk.
 \end{itemize}
 
 \subsection{Community Detection: Louvain Algorithm}
@@ -337,6 +337,13 @@ The network exhibits classic \textbf{scale-free} characteristics, typical of pre
     \textit{This pattern validates the hypothesis that musical influence follows the same mathematical principles as citation networks and social networks, where established authorities accumulate disproportionate influence over time.}
 \end{quote}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{fig6_degree_distribution.pdf}
+    \caption{Power-Law Degree Distribution. The log-log plot of node frequency versus in-degree forms a distinct linear decay (fitted with a regression line), providing visual proof of the network's scale-free topology.}
+    \label{fig:degree_distribution}
+\end{figure}
+
 \begin{table}[H]
     \centering
     \begin{tabular}{lrl}
@@ -364,7 +371,7 @@ Comparing the results of Degree Centrality (Volume) against PageRank (Authority)
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{fig1_volume_vs_authority.pdf}
-    \caption{Volume (In-Degree) vs. Authority (PageRank) — 3-panel comparison. Left: top 20 by volume. Center: top 20 by authority. Right: scatter plot revealing "surprise" artists — Daniel Ingram and Denonbu rank high in authority despite moderate volume (red), while Daft Punk and Lady Gaga dominate volume but rank lower in authority (blue).}
+    \caption{Volume (In-Degree) vs. Authority (PageRank) — 3-panel comparison. Left: top 20 by volume. Center: top 20 by authority. Right: Rank vs Rank scatter plot comparing an artist's rank by volume against their rank by authority. The diagonal line represents perfect agreement. "Surprise" artists like Daniel Ingram outperform their volume and sit far above the diagonal (red), while volume-heavy artists like Daft Punk sit below (blue).}
     \label{fig:volume_authority}
 \end{figure}
 
@@ -381,7 +388,7 @@ Figure~\ref{fig:hubbridges} merges two complementary views of artist roles. The 
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{fig2_hub_bridges.pdf}
-    \caption{Merged hub analysis and bridge discovery. Left: in-degree vs out-degree scatter (dots colored by cluster, red = top 15 by volume). Right: top 15 bridges by geometric mean of in and out degree (bars colored by cluster). Four quadrants are delineated by median lines: Authorities (top-left), Bridges (top-right), Heavy Samplers (bottom-right), and Peripheral Artists (bottom-left).}
+    \caption{Merged hub analysis and bridge discovery. Left: in-degree vs out-degree scatter (dots colored by cluster, red = top 15 by volume). Right: top 15 bridges by geometric mean of in and out degree (bars colored by cluster). Four quadrants are delineated by mean lines: Authorities (top-left), Bridges (top-right), Heavy Samplers (bottom-right), and Peripheral Artists (bottom-left).}
     \label{fig:hubbridges}
 \end{figure}
 
@@ -390,7 +397,7 @@ Figure~\ref{fig:hubbridges} merges two complementary views of artist roles. The 
     \item \textbf{Pure Authorities} (top-left quadrant): Artists like James Brown and Daft Punk --- sampled extensively but use few samples themselves. They are the ``source material'' of modern music.
     \item \textbf{Bridges} (top-right quadrant): Artists who both sample heavily AND get sampled. Evolutionary nodes like \textbf{JAY-Z}, \textbf{Beastie Boys}, and \textbf{Ye (Kanye West)} maintain a near-perfect balance, acting as the crucial connective tissue of modern music.
     \item \textbf{Heavy Samplers} (bottom-right quadrant): Modern producers who rely extensively on sampling but haven't yet become authorities themselves.
-    \item \textbf{Peripheral Artists} (bottom-left quadrant): Artists with below-median in-degree and out-degree. These represent the majority of nodes in the long tail of the distribution.
+    \item \textbf{Peripheral Artists} (bottom-left quadrant): Artists with below-mean in-degree and out-degree. These represent the majority of nodes in the long tail of the distribution.
 \end{itemize}
 
 \subsection{External Validation Against Ground Truth}
@@ -477,7 +484,7 @@ Table~\ref{tab:graphstats} provides a comprehensive overview of the network's ma
 \end{table}
 
 \subsection{Interactive D3.js Visualization}
-To effectively explore the immense scale of the expanded dataset (over 58,000 edges), I also developed an interactive web-based D3.js visualization that allows users to pan, zoom, and click on nodes to inspect real-time Authority Scores and isolate specific sampling lineages. The visualization colors nodes by their genealogical family (Louvain cluster) and uses distinct edge styling for intra-cluster and inter-cluster connections, mirroring the logic of Figure~\ref{fig:clusternetwork}. 
+To effectively explore the immense scale of the expanded dataset (over 58,000 edges), an interactive web-based D3.js visualization was developed that allows users to pan, zoom, and click on nodes to inspect real-time Authority Scores and isolate specific sampling lineages. The visualization colors nodes by their genealogical family (Louvain cluster) and uses distinct edge styling for intra-cluster and inter-cluster connections, mirroring the logic of Figure~\ref{fig:clusternetwork}. 
 
 \vspace{0.3cm}
 \begin{center}
@@ -527,13 +534,13 @@ This analysis demonstrates that musical influence is fundamentally a \textbf{net
 
 \subsection{Methodological Contributions}
 \begin{itemize}
-    \item \textbf{From-Scratch Implementation}: Implementing PageRank manually in PySpark and Louvain community detection via NetworkX demonstrates deep understanding of distributed graph algorithms beyond using pre-built libraries.
+    \item \textbf{Algorithm Implementation}: The PageRank algorithm was implemented from scratch using PySpark's MapReduce paradigm, while community detection utilized the Louvain algorithm via NetworkX.
     
-    \item \textbf{Data Engineering}: Successfully navigating MusicBrainz's complex relational schema (Third Normal Form) and transforming it into a graph structure showcases real-world data engineering skills.
+    \item \textbf{Data Engineering}: The data pipeline successfully navigated MusicBrainz's highly normalized relational schema (Third Normal Form) to extract and construct the property graph.
     
-    \item \textbf{Convergence Optimization}: Implementing a fixed 50-iteration scheme with convergence monitoring ensures stable PageRank scores with proper sink-mass redistribution.
+    \item \textbf{Convergence Optimization}: Implementing a fixed 50-iteration scheme with convergence monitoring ensured stable PageRank scores with proper sink-mass redistribution.
     
-    \item \textbf{Visualization Strategy}: Creating clean, non-overlapping network visualizations makes complex structures interpretable.
+    \item \textbf{Visualization Strategy}: Network visualizations were developed to effectively present the complex community structures without overlap.
 \end{itemize}
 
 \subsection{Limitations and Future Work}
@@ -566,7 +573,6 @@ This project successfully applied graph mining techniques to uncover the hidden 
 
 \noindent This analysis shifts the conversation from "who sold the most records" to "who structurally shaped modern music." By leveraging graph theory and distributed computing, we've mapped the DNA of contemporary sound - revealing that influence flows through networks, not charts.
 
-\textbf{Impact}: This methodology could extend to other domains: academic citation networks (which papers are foundational?), social media influence (who drives conversation?), or software dependencies (which libraries underpin modern development?). Future work should extend this analysis to temporal dynamics, multi-hop genealogy, and cross-domain validation.
 
 \printbibliography[title={References}]
 \end{document}

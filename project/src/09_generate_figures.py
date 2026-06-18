@@ -1,6 +1,13 @@
 """
-Report Figure Generator
-Generates Fig 1 (Volume vs Authority, 3-panel) and Fig 5 (Cluster Distribution).
+Report Figure and Statistics Generator
+
+This script generates foundational visualizations and statistics for the final report.
+
+It produces:
+- Figure 1: Volume vs Authority (3-panel plot including the Rank-vs-Rank scatter)
+- Figure 5: Cluster Size Distribution
+- Figure 6: Power-Law Degree Distribution
+- `statistics_summary.txt`: A text file containing network density, in/out degree stats, and power-law concentration percentages.
 """
 
 from pyspark.sql import SparkSession
@@ -103,53 +110,52 @@ try:
     ax2.invert_yaxis()
     ax2.grid(axis="x", alpha=0.3)
 
-    # Right: Volume vs Authority scatter
+    # Right: Rank vs Rank scatter
+    scatter_df["vol_rank"] = scatter_df["times_sampled"].rank(method="min", ascending=False)
+    scatter_df["auth_rank"] = scatter_df["authority_score"].rank(method="min", ascending=False)
+
     ax3.scatter(
-        scatter_df["times_sampled"], scatter_df["authority_score"],
+        scatter_df["vol_rank"], scatter_df["auth_rank"],
         s=15, alpha=0.25, c="#7f8c8d", edgecolors="none", zorder=2,
     )
+    
+    max_rank = max(scatter_df["vol_rank"].max(), scatter_df["auth_rank"].max())
+    ax3.plot([1, max_rank], [1, max_rank], color="gray", linestyle="--", alpha=0.5, zorder=1)
 
-    surprise_artists = {
-        "Daniel Ingram": (130, 59.85),
-        "電音部": (70, 40.90),
-        "外神田文芸高校": (45, 35.61),
-        "Porter Robinson": (55, 18.68),
-        "Toby Fox": (35, 23.73),
-        "C418": (40, 19.25),
-    }
-    vol_authority_dict = dict(zip(scatter_df["Original_Artist_Name"], zip(scatter_df["times_sampled"], scatter_df["authority_score"])))
+    surprise_artists = ["Daniel Ingram", "電音部", "外神田文芸高校", "Porter Robinson", "Toby Fox", "C418"]
+    vol_heavy = ["Daft Punk", "Lady Gaga", "Michael Jackson"]
 
-    for name, (v, a) in surprise_artists.items():
-        if name in vol_authority_dict:
-            v, a = vol_authority_dict[name]
+    for _, row in scatter_df[scatter_df["Original_Artist_Name"].isin(surprise_artists)].iterrows():
+        v, a = row["vol_rank"], row["auth_rank"]
         ax3.scatter([v], [a], s=80, c="#E74C3C", edgecolors="#C0392B", linewidths=1.5, zorder=10)
         ax3.annotate(
-            name,
+            row["Original_Artist_Name"],
             xy=(v, a),
-            xytext=(v * 1.3, a * 1.05),
+            xytext=(v * 1.5, a * 0.3),
             fontsize=8, fontweight="bold",
             bbox=dict(boxstyle="round,pad=0.3", facecolor="#FFFACD", edgecolor="#E74C3C", alpha=0.85),
             arrowprops=dict(arrowstyle="->", color="#E74C3C", lw=0.8, alpha=0.6),
         )
 
-    # Label volume-heavy artists (high vol, low auth)
-    vol_heavy = {"Daft Punk": (370, 27.08), "Lady Gaga": (282, 10.66), "Michael Jackson": (260, 22.59)}
-    for name, (v, a) in vol_heavy.items():
-        if name in vol_authority_dict:
-            v, a = vol_authority_dict[name]
+    for _, row in scatter_df[scatter_df["Original_Artist_Name"].isin(vol_heavy)].iterrows():
+        v, a = row["vol_rank"], row["auth_rank"]
         ax3.scatter([v], [a], s=80, c="#3498DB", edgecolors="#2980B9", linewidths=1.5, zorder=10)
         ax3.annotate(
-            name,
+            row["Original_Artist_Name"],
             xy=(v, a),
-            xytext=(v * 1.3, a * 0.85),
+            xytext=(v * 0.3, a * 1.5),
             fontsize=8, fontweight="bold",
             bbox=dict(boxstyle="round,pad=0.3", facecolor="#E8F4FD", edgecolor="#3498DB", alpha=0.85),
             arrowprops=dict(arrowstyle="->", color="#3498DB", lw=0.8, alpha=0.6),
         )
 
-    ax3.set_xlabel("Volume (Times Sampled)", fontsize=11, fontweight="bold")
-    ax3.set_ylabel("Authority (PageRank Score)", fontsize=11, fontweight="bold")
-    ax3.set_title("Volume vs Authority\n(Each dot = one artist)", fontsize=12, fontweight="bold")
+    ax3.set_xlabel("Volume Rank (1 = Most Sampled)", fontsize=11, fontweight="bold")
+    ax3.set_ylabel("Authority Rank (1 = Highest PageRank)", fontsize=11, fontweight="bold")
+    ax3.set_title("Rank vs Rank Comparison\n(Highlighting Divergence)", fontsize=12, fontweight="bold")
+    
+    # Set axes so rank 1 is at top-right
+    ax3.set_xlim(max_rank * 1.2, 0.8)
+    ax3.set_ylim(max_rank * 1.2, 0.8)
     ax3.set_xscale("log")
     ax3.set_yscale("log")
     ax3.grid(True, alpha=0.3, linestyle="--")
@@ -157,9 +163,9 @@ try:
     legend_elements = [
         Line2D([0], [0], marker="o", color="w", markerfacecolor="#E74C3C", markersize=8, label="High Authority Surprises"),
         Line2D([0], [0], marker="o", color="w", markerfacecolor="#3498DB", markersize=8, label="High Volume Heavyweights"),
-        Line2D([0], [0], marker="o", color="w", markerfacecolor="#7f8c8d", markersize=5, alpha=0.3, label="Other Artists"),
+        Line2D([0], [0], color="gray", linestyle="--", label="Matched Ranking"),
     ]
-    ax3.legend(handles=legend_elements, loc="lower right", fontsize=7, framealpha=0.9)
+    ax3.legend(handles=legend_elements, loc="lower left", fontsize=7, framealpha=0.9)
 
     plt.tight_layout()
     png_path = "figures/report_figures/fig1_volume_vs_authority.png"
@@ -293,6 +299,43 @@ top10_share = in_degree_sorted.head(top_10_pct)["degree"].sum() / total_samples 
 
 print(f"  Concentration: Top 1% = {top1_share:.1f}%, Top 5% = {top5_share:.1f}%, Top 10% = {top10_share:.1f}%")
 
+print("\n[3.5/4] Generating Degree Distribution (Power-Law) Plot (Fig 6)...")
+try:
+    degree_freq = in_degree.groupby("degree").size().reset_index(name="frequency")
+    
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.scatter(degree_freq["degree"], degree_freq["frequency"], color="#3498DB", alpha=0.7, edgecolors="white", s=40)
+    
+    # Fit line to log-log data
+    import numpy as np
+    log_x = np.log10(degree_freq["degree"])
+    log_y = np.log10(degree_freq["frequency"])
+    m, b = np.polyfit(log_x, log_y, 1)
+    
+    x_fit = np.logspace(np.log10(degree_freq["degree"].min()), np.log10(degree_freq["degree"].max()), 100)
+    y_fit = (10**b) * (x_fit**m)
+    
+    ax.plot(x_fit, y_fit, color="#E74C3C", linestyle="--", linewidth=2, label=f"Power-Law Fit (γ ≈ {abs(m):.2f})")
+    
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("Degree (Number of Times Sampled)", fontsize=11, fontweight="bold")
+    ax.set_ylabel("Frequency (Number of Artists)", fontsize=11, fontweight="bold")
+    ax.set_title("Degree Distribution of the Sampling Network\n(Log-Log Scale)", fontsize=13, fontweight="bold")
+    ax.grid(True, alpha=0.3, linestyle="--")
+    ax.legend(loc="upper right", fontsize=10)
+    
+    plt.tight_layout()
+    png_path = "figures/report_figures/fig6_degree_distribution.png"
+    pdf_path = "figures/report_figures/fig6_degree_distribution.pdf"
+    plt.savefig(png_path, bbox_inches="tight")
+    plt.savefig(pdf_path, bbox_inches="tight")
+    print(f"  Saved: {png_path}")
+    print(f"  Saved: {pdf_path}")
+    plt.close()
+except Exception as e:
+    print(f"  Warning: Could not generate degree distribution: {e}")
+
 
 # =============================================================================
 # Statistics summary file
@@ -340,7 +383,7 @@ print("  Saved: statistics_summary.txt")
 report_img_dir = "../report/Immagini"
 if os.path.exists(report_img_dir):
     for fname in os.listdir("figures/report_figures"):
-        if fname.startswith(("fig1_", "fig5_")):
+        if fname.startswith(("fig1_", "fig5_", "fig6_")):
             src = os.path.join("figures/report_figures", fname)
             dst = os.path.join(report_img_dir, fname)
             if os.path.isfile(src):

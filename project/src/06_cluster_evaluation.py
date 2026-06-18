@@ -1,6 +1,17 @@
 """
 Cluster Quality Analysis
-Evaluates the quality of Label Propagation clustering using metrics like Modularity and cohesion.
+
+This script evaluates the structural quality of the Louvain communities identified in the network.
+It computes metrics such as size distribution, intra-cluster edge fraction (a simplified 
+cohesion metric), and inter-cluster connections (identifying paths between communities).
+
+The pipeline performs the following steps:
+1. Loads the music graph edges and the assigned cluster labels.
+2. Computes the size distribution of the clusters.
+3. Calculates the Intra-Cluster Edge Fraction (proportion of edges within the same community).
+4. Analyzes the internal edge density of the top 5 largest clusters.
+5. Identifies "bridge" connections (edges connecting different clusters).
+6. Exports the quality metrics as CSV summaries.
 """
 
 from pyspark.sql import SparkSession
@@ -79,6 +90,7 @@ artist_to_cluster = df_labels.select(
 )
 
 # Join edges with cluster information for both source and target
+# This allows us to see if an edge connects nodes in the SAME cluster or DIFFERENT clusters.
 edges_with_clusters = df_graph \
     .join(artist_to_cluster.alias("src_cluster"), 
           df_graph.Sampler_Artist_Name == col("src_cluster.artist_name"), 
@@ -161,6 +173,7 @@ for i, row in enumerate(top_clusters, 1):
     internal_edges = edges_row[0]["internal_edges"] if edges_row else 0
     
     # Maximum possible edges in a directed graph: n * (n-1)
+    # Density measures how close the cluster is to a complete clique.
     max_possible = cluster_size * (cluster_size - 1)
     density = internal_edges / max_possible if max_possible > 0 else 0
     
@@ -182,6 +195,7 @@ print("-" * 70)
 print("Artists that connect different musical communities")
 
 # Find edges between different clusters
+# This aggregation reveals which distinct communities sample each other the most.
 bridges = edges_with_clusters \
     .filter(col("src_cluster_id") != col("tgt_cluster_id")) \
     .filter(col("src_cluster_id").isNotNull()) \

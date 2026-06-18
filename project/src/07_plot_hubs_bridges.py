@@ -1,6 +1,16 @@
 """
-Music Genealogy Network Visualizations
-Merged Hub Analysis + Top Bridges figure (Fig 2).
+Genealogy Visualizations: Hubs and Bridges
+
+This script generates Figure 2 (Merged Hub Analysis and Bridge Discovery).
+It visualizes the classification of artists based on their sampling behavior
+(In-Degree vs. Out-Degree) and highlights the "evolutionary bridges" that
+connect different musical communities.
+
+The script:
+1. Loads the music graph and community labels.
+2. Calculates in-degree (times sampled) and out-degree (samples used) for each artist.
+3. Classifies artists into four quadrants (Authorities, Bridges, Heavy Samplers, Peripherals).
+4. Generates a scatter plot and a bar chart of the top bridges.
 """
 
 import pandas as pd
@@ -84,10 +94,13 @@ spark.stop()
 in_deg_log = degree_df["in_degree"] + 1
 out_deg_log = degree_df["out_degree"] + 1
 
-median_in = in_deg_log.median()
-median_out = out_deg_log.median()
+threshold_in = in_deg_log.mean()
+threshold_out = out_deg_log.mean()
 
 top_volume = degree_df.sort_values("in_degree", ascending=False).head(15)
+
+# Calculate "Bridge Score" (Geometric mean of in-degree and out-degree)
+# Bridges must score high in BOTH sampling others AND being sampled.
 top_bridges = degree_df.copy()
 top_bridges["bridge_score"] = np.sqrt(top_bridges["in_degree"] * top_bridges["out_degree"])
 top_bridges = top_bridges.sort_values("bridge_score", ascending=False).head(15)
@@ -113,8 +126,8 @@ ax1.scatter(
     s=150, c="#E74C3C", edgecolors="#C0392B", linewidths=2, zorder=5, label="Top 15 by Volume",
 )
 
-ax1.axhline(y=median_in, color="gray", linestyle="--", alpha=0.5, linewidth=1.2)
-ax1.axvline(x=median_out, color="gray", linestyle="--", alpha=0.5, linewidth=1.2)
+ax1.axhline(y=threshold_in, color="black", linestyle="--", alpha=0.8, linewidth=1.5)
+ax1.axvline(x=threshold_out, color="black", linestyle="--", alpha=0.8, linewidth=1.5)
 
 # Label bridges
 bridges_to_label = top_bridges.head(8)

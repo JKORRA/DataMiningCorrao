@@ -26,16 +26,16 @@ DataMiningCorrao/
 ├── README.md                          # This file
 ├── project/                           # Source code and data processing
 │   ├── src/                          # Core analysis scripts
-│   │   ├── advanced_experiments.py   # Bridges, authority context, macro flow
-│   │   ├── cluster.py                # Louvain community detection
-│   │   ├── cluster_quality.py        # Modularity and cluster metrics
-│   │   ├── compute_authority_manual.py # PageRank implementation
-│   │   ├── data_preparation.py       # Data ingestion and graph construction
-│   │   ├── external_validation.py    # Spearman correlation against ground truth
-│   │   ├── genealogy_visualizations.py # Network diagrams
-│   │   ├── generate_report_figures.py # Statistical visualizations
-│   │   ├── top_ranking.py            # Degree centrality analysis
-│   │   └── validation_metrics.py     # Network statistics
+│   │   ├── 01_build_graph.py         # Data ingestion and graph construction
+│   │   ├── 02_degree_centrality.py   # Degree centrality analysis
+│   │   ├── 03_page_rank.py           # PageRank implementation
+│   │   ├── 04_louvain_clustering.py  # Louvain community detection
+│   │   ├── 05_network_statistics.py  # Network statistics
+│   │   ├── 06_cluster_evaluation.py  # Modularity and cluster metrics
+│   │   ├── 07_plot_hubs_bridges.py   # Network diagrams
+│   │   ├── 08_authority_context.py   # Bridges, authority context, macro flow
+│   │   ├── 09_generate_figures.py    # Statistical visualizations
+│   │   └── 10_ground_truth_validation.py # Spearman correlation against ground truth
 │   │
 │   ├── utils/                        # Utility scripts
 │   │   ├── analyze_selfloops.py      # Self-loop detection analysis
@@ -113,37 +113,37 @@ This executes the full analysis pipeline:
 **Option 2: Individual Steps**
 ```bash
 # 1. Prepare data and construct graph
-python3 src/data_preparation.py
+python3 src/01_build_graph.py
 
 # 2. Analyze degree centrality
-python3 src/top_ranking.py
+python3 src/02_degree_centrality.py
 
 # 3. Calculate PageRank authority
-python3 src/compute_authority_manual.py
+python3 src/03_page_rank.py
 
 # 4. Detect communities
-python3 src/cluster.py
+python3 src/04_louvain_clustering.py
 
 # 5. Calculate graph validation metrics
-python3 src/validation_metrics.py
+python3 src/05_network_statistics.py
 
 # 6. Calculate cluster quality
-python3 src/cluster_quality.py
+python3 src/06_cluster_evaluation.py
 
 # 7. Visualize clusters
 python3 utils/visualize_cluster.py
 
 # 8. Generate network visualizations
-python3 src/genealogy_visualizations.py
+python3 src/07_plot_hubs_bridges.py
 
 # 9. Run advanced experiments
-python3 src/advanced_experiments.py
+python3 src/08_authority_context.py
 
 # 10. Generate statistical figures
-python3 src/generate_report_figures.py
+python3 src/09_generate_figures.py
 
 # 11. Run external validation
-python3 src/external_validation.py
+python3 src/10_ground_truth_validation.py
 
 # 12. Generate interactive visualization
 python3 utils/generate_interactive_network.py

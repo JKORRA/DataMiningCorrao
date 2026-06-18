@@ -42,8 +42,8 @@ print_error() {
 }
 
 # Check if we're in the right directory
-if [ ! -f "src/data_preparation.py" ]; then
-    print_error "Error: src/data_preparation.py not found!"
+if [ ! -f "src/01_build_graph.py" ]; then
+    print_error "Error: src/01_build_graph.py not found!"
     print_warning "Please run this script from the dataset directory"
     exit 1
 fi
@@ -70,7 +70,7 @@ if [ -f "outputs/music_graph.parquet/_SUCCESS" ]; then
     print_warning "outputs/music_graph.parquet already exists. Skipping data preparation."
     print_warning "Delete outputs/music_graph.parquet to rebuild from scratch."
 else
-    python3 src/data_preparation.py
+    python3 src/01_build_graph.py
     if [ $? -eq 0 ]; then
         print_success "Graph built successfully → outputs/music_graph.parquet"
     else
@@ -84,7 +84,7 @@ fi
 # =============================================================================
 print_step "STEP 2/12: Descriptive Analysis (Volume-based Rankings)"
 
-python3 src/top_ranking.py
+python3 src/02_degree_centrality.py
 if [ $? -eq 0 ]; then
     print_success "Top rankings calculated"
 else
@@ -97,7 +97,7 @@ fi
 # =============================================================================
 print_step "STEP 3/12: PageRank Authority Calculation (WITH FIXES)"
 
-python3 src/compute_authority_manual.py
+python3 src/03_page_rank.py
 if [ $? -eq 0 ]; then
     print_success "PageRank completed → outputs/artist_pagerank.parquet"
 else
@@ -110,7 +110,7 @@ fi
 # =============================================================================
 print_step "STEP 4/12: Label Propagation Clustering"
 
-python3 src/cluster.py
+python3 src/04_louvain_clustering.py
 if [ $? -eq 0 ]; then
     print_success "Clustering completed → outputs/music_labels.parquet"
 else
@@ -123,7 +123,7 @@ fi
 # =============================================================================
 print_step "STEP 5/12: Graph Validation Metrics (NEW)"
 
-python3 src/validation_metrics.py
+python3 src/05_network_statistics.py
 if [ $? -eq 0 ]; then
     print_success "Validation metrics calculated → outputs/validation_summary.csv"
 else
@@ -136,7 +136,7 @@ fi
 # =============================================================================
 print_step "STEP 6/12: Cluster Quality Analysis (NEW)"
 
-python3 src/cluster_quality.py
+python3 src/06_cluster_evaluation.py
 if [ $? -eq 0 ]; then
     print_success "Cluster quality evaluated → outputs/cluster_quality_summary.csv"
 else
@@ -162,7 +162,7 @@ fi
 # =============================================================================
 print_step "STEP 8/12: Hub Analysis + Bridges (Fig 2)"
 
-python3 src/genealogy_visualizations.py
+python3 src/07_plot_hubs_bridges.py
 if [ $? -eq 0 ]; then
     print_success "Hub + bridges visualization generated → figures/"
 else
@@ -175,7 +175,7 @@ fi
 # =============================================================================
 print_step "STEP 9/12: Authority Context Analysis (Fig 3)"
 
-python3 src/advanced_experiments.py
+python3 src/08_authority_context.py
 if [ $? -eq 0 ]; then
     print_success "Authority context completed → figures/"
 else
@@ -188,7 +188,7 @@ fi
 # =============================================================================
 print_step "STEP 10/12: Generate Report Figures (Fig 1 + Fig 5)"
 
-python3 src/generate_report_figures.py
+python3 src/09_generate_figures.py
 if [ $? -eq 0 ]; then
     print_success "Report figures generated → figures/report_figures/"
 else
@@ -201,7 +201,7 @@ fi
 # =============================================================================
 print_step "STEP 11/12: External Validation against Ground Truth"
 
-python3 src/external_validation.py
+python3 src/10_ground_truth_validation.py
 if [ $? -eq 0 ]; then
     print_success "Validation generated → outputs/external_validation.csv"
 else

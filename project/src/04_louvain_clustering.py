@@ -1,3 +1,19 @@
+"""
+Louvain Community Detection
+
+This script performs network community detection using the Louvain method via NetworkX.
+It identifies dense clusters of artists (musical communities or genres) based on their
+sampling behavior.
+
+The pipeline performs the following steps:
+1. Loads the edge list from the pre-processed Parquet file.
+2. Builds a directed weighted artist graph.
+3. Converts the graph to an undirected weighted graph (required by the Louvain algorithm).
+4. Runs the Louvain heuristic to partition the network into distinct communities.
+5. Identifies a "representative" artist for each community (the artist with the highest degree).
+6. Saves the cluster assignments as Parquet and CSV files for downstream analysis.
+"""
+
 import pandas as pd
 import networkx as nx
 from networkx.algorithms.community import louvain_communities
@@ -9,6 +25,8 @@ print("Loading graph...")
 df = pd.read_parquet("outputs/music_graph.parquet")
 
 # Remove self-loops using Artist Names
+# Self-loops represent an artist sampling themselves, which inflates their degree
+# but provides no structural information about community membership.
 self_loops = (df["Sampler_Artist_Name"] == df["Original_Artist_Name"]).sum()
 if self_loops > 0:
     print(f"Removing {self_loops} self-loops...")
@@ -17,7 +35,7 @@ if self_loops > 0:
 print(f"Graph loaded: {len(df)} edges")
 
 # Build directed graph from artist-level edges
-# Edge direction: Sampler -> Original (sampler samples the original)
+# Edge direction: Sampler -> Original (authority flows from sampler to the original artist)
 print("Building artist graph...")
 G = nx.DiGraph()
 for _, row in df.iterrows():
@@ -25,13 +43,14 @@ for _, row in df.iterrows():
     v = row["Original_Artist_Name"]
     w = row.get("weight", 1.0)
     if G.has_edge(u, v):
-        G[u][v]["weight"] += w
+        G[u][v]["weight"] += w  # Aggregate weights for multiple samples between the same artists
     else:
         G.add_edge(u, v, weight=w)
 
 print(f"Artist graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} directed edges")
 
 # Convert to undirected for Louvain (aggregate parallel edge weights)
+# Louvain requires an undirected graph. We sum the weights of reciprocal edges (A->B and B->A).
 print("Converting to undirected graph for community detection...")
 G_undirected = nx.Graph()
 for u, v, d in G.edges(data=True):
@@ -44,12 +63,14 @@ for u, v, d in G.edges(data=True):
 print(f"Undirected graph: {G_undirected.number_of_nodes()} nodes, {G_undirected.number_of_edges()} edges")
 
 # Louvain community detection
+# The resolution parameter controls the size of the communities.
+# resolution=1.0 is the standard Newman-Girvan modularity.
 print("Running Louvain community detection (resolution=1.0)...")
 communities = list(louvain_communities(G_undirected, weight="weight", resolution=1.0, seed=42))
 print(f"Found {len(communities)} communities")
 
-# Assign community IDs (0-indexed + pick representative per cluster)
-# Representative = node with highest weighted degree in that community
+# Assign community IDs (0-indexed) and pick a representative per cluster
+# The representative is chosen as the node with the highest weighted degree within that community.
 weighted_deg = dict(G_undirected.degree(weight="weight"))
 
 community_map = {}

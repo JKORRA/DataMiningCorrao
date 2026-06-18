@@ -1,6 +1,18 @@
 """
-Advanced Data Mining Experiments for Music Genealogy
-Generates Fig 3: Authority Context (Internal vs External Influence).
+Advanced Data Mining Experiments: Authority Context
+
+This script generates Figure 3: Authority Context (Internal vs External Influence).
+It analyzes the top 15 authorities (by PageRank) to determine if their influence
+is "mainstream" (sampled by many different communities) or "niche/internal" 
+(sampled primarily by artists within their own specific community).
+
+The pipeline performs the following steps:
+1. Loads the music graph, PageRank scores, and community labels.
+2. Identifies the top 15 authorities.
+3. Retrieves all incoming sampling edges for these 15 artists.
+4. Joins the edges with community labels to determine if the sampler and original artist belong to the same community.
+5. Calculates the percentage of internal vs external incoming samples.
+6. Generates a stacked bar chart visualizing these proportions.
 """
 
 from pyspark.sql import SparkSession
@@ -77,12 +89,13 @@ edges = edges.join(
     artist_clusters, edges.Sampler_Artist_Name == artist_clusters.artist_name, "left"
 ).withColumnRenamed("cluster_representative", "sampler_cluster").drop("artist_name")
 
-# Categorize as Internal or External
+# Categorize each incoming edge as Internal (same community) or External
 edges = edges.withColumn(
     "is_internal",
     when(col("original_cluster") == col("sampler_cluster"), 1).otherwise(0),
 )
 
+# Aggregate internal vs total samples per artist
 stats = (
     edges.groupBy("Original_Artist_Name")
     .agg(count("*").alias("total_samples"), _sum("is_internal").alias("internal_samples"))

@@ -1,6 +1,15 @@
 """
 Music Graph Validation Metrics
-Calculates comprehensive statistics to validate data quality and understand network structure.
+
+This script calculates comprehensive statistics to validate the data quality
+and understand the basic structural properties of the network.
+
+The pipeline performs the following steps:
+1. Computes basic graph statistics (node count, edge count, density).
+2. Analyzes the in-degree and out-degree distributions.
+3. Tests for power-law concentration to verify scale-free network properties.
+4. Performs data quality checks (null values, self-loops, duplicate edges).
+5. Calculates reciprocity (fraction of bidirectional sampling relationships).
 """
 
 from pyspark.sql import SparkSession
@@ -173,7 +182,8 @@ print("\n🌐 NETWORK CONNECTIVITY")
 print("-" * 70)
 
 # Reciprocity: fraction of edges that are bidirectional
-# Count edges where A->B and B->A both exist
+# Counts how often Artist A samples Artist B AND Artist B samples Artist A.
+# This is usually very low in citation/sampling networks.
 edges_ab = df_graph.select(
     col("Sampler_Artist_Name").alias("a"),
     col("Original_Artist_Name").alias("b")

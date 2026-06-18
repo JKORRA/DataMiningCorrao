@@ -9,16 +9,16 @@ This directory contains all the source code, data processing scripts, and analys
 ```
 project/
 ├── src/                    # Core analysis scripts (10 files)
-│   ├── advanced_experiments.py
-│   ├── cluster.py
-│   ├── cluster_quality.py
-│   ├── compute_authority_manual.py
-│   ├── data_preparation.py
-│   ├── external_validation.py
-│   ├── genealogy_visualizations.py
-│   ├── generate_report_figures.py
-│   ├── top_ranking.py
-│   └── validation_metrics.py
+│   ├── 01_build_graph.py
+│   ├── 02_degree_centrality.py
+│   ├── 03_page_rank.py
+│   ├── 04_louvain_clustering.py
+│   ├── 05_network_statistics.py
+│   ├── 06_cluster_evaluation.py
+│   ├── 07_plot_hubs_bridges.py
+│   ├── 08_authority_context.py
+│   ├── 09_generate_figures.py
+│   └── 10_ground_truth_validation.py
 │
 ├── utils/                  # Utility scripts (3 files)
 │   ├── analyze_selfloops.py
@@ -61,8 +61,8 @@ source .venv/bin/activate
 ./run_pipeline.sh
 
 # Or run individual steps
-python3 src/data_preparation.py
-python3 src/compute_authority_manual.py
+python3 src/01_build_graph.py
+python3 src/03_page_rank.py
 # ... etc
 ```
 
@@ -71,7 +71,7 @@ python3 src/compute_authority_manual.py
 ## 📄 Core Scripts Description
 
 ### Data Processing
-- **data_preparation.py**
+- **01_build_graph.py**
   - Loads MusicBrainz TSV files with manual schema
   - Multiplex network: weighted edges for sampling, remix, mashup
   - Temporal evolution: computes release year per recording
@@ -79,44 +79,48 @@ python3 src/compute_authority_manual.py
   - Output: `outputs/music_graph.parquet/`
 
 ### Analysis Scripts
-- **top_ranking.py**
+- **02_degree_centrality.py**
   - Calculates in-degree and out-degree centrality
   - Identifies top sampled artists (volume metrics)
   
-- **compute_authority_manual.py**
+- **03_page_rank.py**
   - Artist-Level Weighted PageRank implementation
   - Fixes mass leakage by redistributing dangling node (sink) ranks
   - Convergence criterion (tolerance: 0.0001)
   - Output: `outputs/artist_pagerank.parquet/`
   
-- **cluster.py**
+- **04_louvain_clustering.py**
   - Louvain community detection via NetworkX (resolution r=1.0)
   - Constructs weighted undirected graph from directed sampling edges
   - Output: `outputs/music_clusters.csv`, `outputs/music_cluster_membership.csv`
 
 ### Validation & Quality
-- **validation_metrics.py** (8,723 bytes)
+- **05_network_statistics.py**
   - Network statistics (density, degrees, components)
   - Output: `outputs/validation_summary.csv/`
   
-- **cluster_quality.py**
+- **06_cluster_evaluation.py**
   - Intra-cluster edge fraction (simplified modularity) calculation
   - Cluster size distribution
   - Bridge analysis (inter-cluster connections)
   - Output: `outputs/cluster_quality_summary.csv/`
 
-- **external_validation.py**
+- **10_ground_truth_validation.py**
   - Validates PageRank scores against WhoSampled ground truth
   - Computes Spearman Rank Correlation Coefficient
   - Output: `outputs/external_validation.csv`
 
 ### Visualization
-- **generate_report_figures.py** (23,159 bytes)
+- **09_generate_figures.py**
   - Generates Fig 1 (Volume vs Authority, 3-panel) and Fig 5 (Cluster Distribution)
   - Output: `figures/report_figures/` (PNG + PDF)
   
-- **genealogy_visualizations.py** (21,864 bytes)
+- **07_plot_hubs_bridges.py**
   - Generates Fig 2: merged hub analysis + top bridges
+  - Output: `figures/report_figures/` (PNG + PDF)
+  
+- **08_authority_context.py**
+  - Generates Fig 3: Authority Context (Internal vs External Influence)
   - Output: `figures/report_figures/` (PNG + PDF)
 
 ### Utilities
@@ -196,7 +200,7 @@ See `requirements.txt` for full list:
 ## 📝 Notes
 
 1. **Reproducibility**: Delete `outputs/` and `figures/` to regenerate from scratch
-2. **Self-loops**: Automatically removed in data_preparation.py
+2. **Self-loops**: Automatically removed in 01_build_graph.py
 3. **Virtual Environment**: Pre-configured with all dependencies
 4. **MusicBrainz Data**: Raw dumps in `mbdump/` (~2GB compressed)
 

@@ -1,3 +1,19 @@
+"""
+Data Preparation and Graph Construction
+
+This script reads the raw MusicBrainz database dumps and processes them using PySpark 
+to construct the foundational 'music sampling graph'. 
+
+The pipeline performs the following steps:
+1. Loads raw MusicBrainz tables (recordings, artists, links, tracks, releases) with explicit schemas.
+2. Computes the canonical release year for each recording.
+3. Filters for specific sampling relationships (link types 69, 231, etc.).
+4. Normalizes artist names (handling aliases and mechanical text cleaning).
+5. Joins the data to enrich the sampling edges with readable metadata.
+6. Removes self-loops and unknown entities.
+7. Saves the final processed graph as a Parquet file for downstream analysis.
+"""
+
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 from pyspark.sql.functions import col, broadcast, when, regexp_replace, trim
@@ -105,6 +121,7 @@ df_artist = load_mb_table("artist", artist_schema).select(col("id").alias("artis
 df_acn = load_mb_table("artist_credit_name", artist_credit_name_schema).select("artist_credit", "position", "artist")
 
 # Get primary canonical artist for each artist_credit
+# We filter position == 0 to get the main credited artist, then clean features (e.g. "feat. X")
 df_artist_credit = df_acn.filter(col("position") == 0) \
     .join(df_artist, df_acn.artist == df_artist.artist_id) \
     .select(col("artist_credit").alias("id"), col("name"), col("gid")) \
@@ -119,6 +136,8 @@ df_release = load_mb_table("release", release_schema).select("id", "release_grou
 df_release_group_meta = load_mb_table("release_group_meta", release_group_meta_schema).select("id", "first_release_date_year")
 
 # Compute the first release year for each recording
+# This requires a multi-table join: track -> medium -> release -> release_group_meta
+# We aggregate by recording ID to find the earliest ('min') release year.
 print("Computing release years...")
 df_rec_year = df_track.join(df_medium, df_track.medium == df_medium.id) \
     .join(df_release, df_medium.release == df_release.id) \
@@ -144,6 +163,7 @@ sampling_edges = df_l_rec_rec.join(df_link, df_l_rec_rec.link == df_link.id) \
 # ---------------------------------------------------------------------------
 
 # Step 1 — Alias mapping (variant → canonical) on original names
+# Uses a broadcast join since the alias dictionary is small and fits in memory.
 ALIAS_PATH = "data/artist_aliases.json"
 if os.path.exists(ALIAS_PATH):
     with open(ALIAS_PATH) as f:
@@ -163,6 +183,7 @@ if os.path.exists(ALIAS_PATH):
         )
 
 # Step 2 — Mechanical normalization on (possibly aliased) names
+# Standardizes text formats (e.g., changing ampersands to 'and', standardizing hyphens)
 normalization_steps = [
     ("(?i)\\s+&\\s+", " and "),
     ("[\\u2010-\\u2015\\u2212]", "-"),
@@ -178,6 +199,8 @@ for pattern, replacement in normalization_steps:
 df_artist_credit = df_artist_credit.withColumn("name", trim(col("name")))
 
 # Enrich edges with song and artist information
+# Joins the raw link edges with recording and artist metadata. 
+# Broadcast joins are used for artists since the deduplicated artist table is relatively small.
 print("Enriching graph with artist and song names...")
 df_source_info = sampling_edges.join(df_recording.alias("src_rec"), sampling_edges.source_song_id == col("src_rec.id")) \
                                .join(broadcast(df_artist_credit).alias("src_art"), col("src_rec.artist_credit") == col("src_art.id")) \
