@@ -184,7 +184,9 @@ python3 utils/generate_interactive_network.py
 
 ## 🎨 Interactive Visualization
 
-An interactive D3.js visualization has been generated to explore the music sampling network:
+An interactive D3.js visualization has been generated to explore the music sampling network. 
+
+<video src="report/Immagini/interactive_graph.mp4" controls="controls" muted="muted" style="max-width: 100%; border-radius: 8px; margin: 15px 0;"></video>
 
 **File**: `project/outputs/interactive_genealogy.html`
 
