@@ -269,7 +269,7 @@ The `fig4_cluster_artist_network` visualization shows the top 50 artists by Page
 
 ---
 
-## 🛠️ Technical Stack
+## Technical Stack
 
 - **Apache Spark 3.5.0** (PySpark) - Distributed graph processing
 - **NetworkX 3.x** - Network visualization
@@ -296,7 +296,7 @@ The `fig4_cluster_artist_network` visualization shows the top 50 artists by Page
 
 ---
 
-## 📄 License & Data Attribution
+## License & Data Attribution
 
 - **MusicBrainz Data**: CC BY-NC-SA 3.0 (Non-commercial use)
 - **Code**: Educational project for academic evaluation
