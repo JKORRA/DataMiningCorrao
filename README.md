@@ -7,7 +7,7 @@
 
 ---
 
-## 📋 Project Overview
+## Project Overview
 
 This project analyzes the **genealogy of music** through sampling relationships, modeling the music ecosystem as a directed graph where nodes represent songs and edges represent sampling events. Using PageRank (implemented from scratch in Apache Spark) and Louvain community detection (via NetworkX), we identify structural authorities and musical communities beyond traditional popularity metrics. Automated alias resolution merges 161 artist name variants (e.g., "James Brown & The Famous Flames" → "James Brown").
 
@@ -19,7 +19,7 @@ This project analyzes the **genealogy of music** through sampling relationships,
 - **Power-law concentration**: Top 1% of artists control 23.5% of all sampling events
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 DataMiningCorrao/
@@ -65,7 +65,7 @@ DataMiningCorrao/
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - **Python 3.8+**
@@ -158,7 +158,7 @@ python3 utils/generate_interactive_network.py
 
 ---
 
-## 📊 Output Files
+## Output Files
 
 ### Analysis Results (`project/outputs/`)
 - `music_graph.parquet/` - Cleaned graph (58,621 edges, no self-loops)
@@ -182,7 +182,7 @@ python3 utils/generate_interactive_network.py
 
 ---
 
-## 🎨 Interactive Visualization
+## Interactive Visualization
 
 An interactive D3.js visualization has been generated to explore the music sampling network. 
 
@@ -201,7 +201,7 @@ https://github.com/user-attachments/assets/b2f330de-ae8c-4372-8ff6-eba99295220a
 
 ---
 
-## 🔬 Methodology Highlights
+## Methodology Highlights
 
 ### 1. Data Engineering
 - **Source**: MusicBrainz PostgreSQL dumps (500K+ relationships)
@@ -230,7 +230,7 @@ The `fig4_cluster_artist_network` visualization shows the top 50 artists by Page
 
 ---
 
-## 📖 Documentation
+## Documentation
 
 ### Main Report
 - **File**: `report/DataMining.pdf`
@@ -244,7 +244,7 @@ The `fig4_cluster_artist_network` visualization shows the top 50 artists by Page
 
 ---
 
-## 🎯 Key Results Summary
+## Key Results Summary
 
 ### Authority Rankings (PageRank)
 1. **Daniel Ingram** - 59.85 (Musical theater / Anime composer)
@@ -281,7 +281,7 @@ The `fig4_cluster_artist_network` visualization shows the top 50 artists by Page
 
 ---
 
-## 📝 Notes for Reproduction
+## Notes for Reproduction
 
 1. **MusicBrainz Data**: The `mbdump/` directory contains the raw database dumps. These are tab-separated files without headers (schema defined in code).
 
@@ -293,13 +293,6 @@ The `fig4_cluster_artist_network` visualization shows the top 50 artists by Page
 
 5. **Reproducibility**: All random seeds are fixed for deterministic clustering results.
 
----
-
-## 📧 Contact
-
-**Student**: Jacopo Corrao  
-**Course**: Data Mining  
-**University**: Università di Trento  
 
 ---
 
@@ -308,7 +301,3 @@ The `fig4_cluster_artist_network` visualization shows the top 50 artists by Page
 - **MusicBrainz Data**: CC BY-NC-SA 3.0 (Non-commercial use)
 - **Code**: Educational project for academic evaluation
 - **Report**: © 2026 Jacopo Corrao
-
----
-
-**Last Updated**: 18 Jun. 2026
